@@ -63,6 +63,11 @@ generator such as Visual Studio. Qt runtime DLLs may need to be deployed beside
 the executable with `windeployqt` before running it outside the Qt development
 environment.
 
+After building, run `run.bat` from the repository root. It launches the
+executable from `build/Release/` so locally deployed Qt, OpenCV, and QML files
+are resolved correctly. If the application has not been built, the launcher
+keeps the error visible and points to these build instructions.
+
 The repository includes a pinned `vcpkg.json` manifest for native OpenCV. With
 vcpkg installed, pass its toolchain when configuring; vcpkg will restore the
 declared OpenCV package automatically:
@@ -88,7 +93,8 @@ py tools/frame_sampler_gui.py
 
 Alternatively, double-click `tools/run_frame_sampler.bat`. The batch launcher
 runs relative to its own directory, so it also works when launched from
-Explorer. See `tools/FRAME_SAMPLER.md` for input formats and extraction details.
+Explorer. `tools/run.bat` is an equivalent short launcher for the sampler. See
+`tools/FRAME_SAMPLER.md` for input formats and extraction details.
 
 ## Reading a two-layer result
 
