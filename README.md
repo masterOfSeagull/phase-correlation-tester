@@ -63,12 +63,14 @@ generator such as Visual Studio. Qt runtime DLLs may need to be deployed beside
 the executable with `windeployqt` before running it outside the Qt development
 environment.
 
-If OpenCV is installed through vcpkg, pass its toolchain as well, for example:
+The repository includes a pinned `vcpkg.json` manifest for native OpenCV. With
+vcpkg installed, pass its toolchain when configuring; vcpkg will restore the
+declared OpenCV package automatically:
 
 ```powershell
 cmake -S . -B build `
   -DCMAKE_PREFIX_PATH="C:/Qt/6.9.2/msvc2022_64" `
-  -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+  -DCMAKE_TOOLCHAIN_FILE="C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake"
 cmake --build build --config Release
 ```
 
