@@ -1,0 +1,34 @@
+# CMake build trees and generated files
+/build/
+/build-*/
+/out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+*.cmake.user
+
+# Compiled binaries and debug artifacts
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.vs/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+
+# Frame-sampler output directories
+*_sampled_frames/
