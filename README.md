@@ -65,10 +65,12 @@ generator such as Visual Studio. Qt runtime DLLs may need to be deployed beside
 the executable with `windeployqt` before running it outside the Qt development
 environment.
 
-After building, run `run.bat` from the repository root. It launches the
-executable from `build/Release/` so locally deployed Qt, OpenCV, and QML files
-are resolved correctly. If the application has not been built, the launcher
-keeps the error visible and points to these build instructions.
+Run `run.bat` from the repository root to build and launch the app. The
+launcher configures `build/` when needed, builds the `Release` target, and then
+starts the executable from `build/Release/` so locally deployed Qt, OpenCV, and
+QML files are resolved correctly. If CMake, configure, build, or QML startup
+fails, the launcher keeps the error visible; startup diagnostics are written to
+`build/Release/phase-correlation-tester.log`.
 
 The repository includes a pinned `vcpkg.json` manifest for native OpenCV. With
 vcpkg installed, pass its toolchain when configuring; vcpkg will restore the

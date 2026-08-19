@@ -92,7 +92,8 @@ ApplicationWindow {
             color: !control.enabled
                    ? "#778291"
                    : control.primary ? "#08131f" : root.textMain
-            font: control.font
+            font.family: control.font.family
+            font.pixelSize: control.font.pixelSize
             font.weight: control.primary ? Font.DemiBold : Font.Medium
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
