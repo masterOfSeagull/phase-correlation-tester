@@ -16,6 +16,8 @@ The primary use case is scenes where more than one coherent translation may exis
 - Optional `±X / ±Y` translation search bounds.
 - Optional Hann window.
 - Analysis runtime.
+- Drag-and-drop image loading: one image fills the next empty slot; dropping two
+  or more images assigns the first two to Image A and Image B.
 
 The heatmap visualizes positive correlation values after normalizing to the strongest positive response and applying a square-root display curve. The square-root curve is visualization-only; peak ranking uses the original correlation values. This makes weaker secondary motion hypotheses easier to see.
 

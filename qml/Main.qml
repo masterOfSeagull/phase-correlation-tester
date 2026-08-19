@@ -12,13 +12,41 @@ ApplicationWindow {
     visible: true
     title: "Phase Correlation Tester"
     color: "#111317"
+    font.pixelSize: 15
 
     property color panel: "#191c22"
     property color panel2: "#20242c"
-    property color border: "#303640"
+    property color border: "#46505f"
     property color textMain: "#f2f4f7"
-    property color textMuted: "#9aa3af"
+    property color textMuted: "#c4ccd8"
     property color accent: "#7db7ff"
+
+    palette.window: panel
+    palette.windowText: textMain
+    palette.base: "#0d0f13"
+    palette.alternateBase: panel2
+    palette.text: textMain
+    palette.button: panel2
+    palette.buttonText: textMain
+    palette.highlight: accent
+    palette.highlightedText: "#111317"
+    palette.placeholderText: textMuted
+
+    function loadDroppedImages(urls) {
+        if (!urls || urls.length === 0)
+            return
+
+        if (urls.length >= 2) {
+            correlationEngine.setImageA(urls[0])
+            correlationEngine.setImageB(urls[1])
+            return
+        }
+
+        if (correlationEngine.imageAUrl.length === 0)
+            correlationEngine.setImageA(urls[0])
+        else
+            correlationEngine.setImageB(urls[0])
+    }
 
     FileDialog {
         id: imageADialog
@@ -43,6 +71,27 @@ ApplicationWindow {
         border.width: 1
     }
 
+    component ActionButton: Button {
+        id: control
+        implicitWidth: 74
+        implicitHeight: 32
+
+        contentItem: Text {
+            text: control.text
+            color: control.enabled ? "#111317" : "#d9e0ea"
+            font: control.font
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        background: Rectangle {
+            radius: 6
+            color: control.enabled ? root.accent : "#4d5664"
+            border.color: control.enabled ? "#a7d0ff" : root.border
+            border.width: 1
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 18
@@ -61,15 +110,15 @@ ApplicationWindow {
                     font.weight: Font.DemiBold
                 }
                 Text {
-                    text: "Inspect global motion hypotheses instead of collapsing the result to one shift."
+                    text: "Load or drop images. One file fills the next slot; two files set Image A and Image B."
                     color: root.textMuted
-                    font.pixelSize: 13
+                    font.pixelSize: 15
                 }
             }
 
             Item { Layout.fillWidth: true }
 
-            Button {
+            ActionButton {
                 text: "Analyze"
                 enabled: correlationEngine.imageAUrl.length > 0 && correlationEngine.imageBUrl.length > 0
                 onClicked: correlationEngine.analyze()
@@ -104,7 +153,7 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 Text { text: "Image A"; color: root.textMain; font.weight: Font.DemiBold }
                                 Item { Layout.fillWidth: true }
-                                Button { text: "Load"; onClicked: imageADialog.open() }
+                                ActionButton { text: "Load"; onClicked: imageADialog.open() }
                             }
 
                             Rectangle {
@@ -138,7 +187,7 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 Text { text: "Image B"; color: root.textMain; font.weight: Font.DemiBold }
                                 Item { Layout.fillWidth: true }
-                                Button { text: "Load"; onClicked: imageBDialog.open() }
+                                ActionButton { text: "Load"; onClicked: imageBDialog.open() }
                             }
 
                             Rectangle {
@@ -387,8 +436,38 @@ ApplicationWindow {
                 verticalAlignment: Text.AlignVCenter
                 text: correlationEngine.statusMessage
                 color: root.textMuted
+                font.pixelSize: 14
                 elide: Text.ElideRight
             }
+        }
+    }
+
+    DropArea {
+        id: imageDropArea
+        anchors.fill: parent
+        z: 10
+
+        onDropped: function(drop) {
+            root.loadDroppedImages(drop.urls)
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: 8
+        z: 9
+        visible: imageDropArea.containsDrag
+        radius: 12
+        color: "#1a7db7ff"
+        border.color: root.accent
+        border.width: 2
+
+        Text {
+            anchors.centerIn: parent
+            text: "Drop one image to fill the next slot, or drop two images for A and B"
+            color: root.textMain
+            font.pixelSize: 18
+            font.weight: Font.DemiBold
         }
     }
 }
