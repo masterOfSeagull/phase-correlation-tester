@@ -154,16 +154,58 @@ void PhaseCorrelationEngine::analyze()
 
     m_runtimeMs = static_cast<double>(timer.nsecsElapsed()) / 1.0e6;
     m_heatmapUrl = heatmap;
+    m_detectedPeaks = detected;
+    m_selectedPeakIndex = 0;
     m_hasResult = true;
+
+    QString previewError;
+    if (!refreshSelectedPreview(previewError)) {
+        m_previewUrl.clear();
+        m_matchedPercent = 0.0;
+    }
+
     emit resultChanged();
+    emit previewChanged();
 
     const Peak &best = detected.front();
-    setStatus(QStringLiteral("Best alignment shift for Image B: dx=%1, dy=%2 px. %3x%4 analyzed in %5 ms.")
-                  .arg(best.dx, 0, 'f', 2)
-                  .arg(best.dy, 0, 'f', 2)
-                  .arg(correlation.cols)
-                  .arg(correlation.rows)
-                  .arg(m_runtimeMs, 0, 'f', 2));
+    QString status = QStringLiteral("Best alignment shift for Image B: dx=%1, dy=%2 px. %3x%4 analyzed in %5 ms.")
+                         .arg(best.dx, 0, 'f', 2)
+                         .arg(best.dy, 0, 'f', 2)
+                         .arg(correlation.cols)
+                         .arg(correlation.rows)
+                         .arg(m_runtimeMs, 0, 'f', 2);
+    if (!previewError.isEmpty()) {
+        status += QStringLiteral(" Candidate preview unavailable: %1").arg(previewError);
+    }
+    setStatus(status);
+}
+
+void PhaseCorrelationEngine::selectPeak(int index)
+{
+    if (!m_hasResult || index < 0 || index >= m_detectedPeaks.size()) {
+        setStatus(QStringLiteral("Select a valid detected peak after running Analyze."));
+        return;
+    }
+
+    m_selectedPeakIndex = index;
+    QString error;
+    if (!refreshSelectedPreview(error)) {
+        m_previewUrl.clear();
+        m_matchedPercent = 0.0;
+        emit previewChanged();
+        setStatus(QStringLiteral("Could not render candidate preview: %1").arg(error));
+        return;
+    }
+
+    emit previewChanged();
+
+    const Peak &peak = m_detectedPeaks[index];
+    setStatus(QStringLiteral("Peak #%1 selected: shift Image B by dx=%2, dy=%3 px. %4% of overlapping pixels pass the %5% similarity threshold.")
+                  .arg(index + 1)
+                  .arg(peak.dx, 0, 'f', 2)
+                  .arg(peak.dy, 0, 'f', 2)
+                  .arg(m_matchedPercent, 0, 'f', 1)
+                  .arg(m_similarityThreshold * 100.0, 0, 'f', 0));
 }
 
 void PhaseCorrelationEngine::setHannWindow(bool value)
@@ -212,6 +254,37 @@ void PhaseCorrelationEngine::setSuppressionRadius(int value)
     emit settingsChanged();
 }
 
+void PhaseCorrelationEngine::setSimilarityThreshold(double value)
+{
+    value = std::clamp(value, 0.0, 1.0);
+    if (std::abs(m_similarityThreshold - value) < 1.0e-9) return;
+
+    m_similarityThreshold = value;
+    emit settingsChanged();
+
+    if (!m_hasResult || m_selectedPeakIndex < 0 || m_selectedPeakIndex >= m_detectedPeaks.size()) {
+        return;
+    }
+
+    QString error;
+    if (!refreshSelectedPreview(error)) {
+        m_previewUrl.clear();
+        m_matchedPercent = 0.0;
+        emit previewChanged();
+        setStatus(QStringLiteral("Could not update candidate preview: %1").arg(error));
+        return;
+    }
+
+    emit previewChanged();
+    const Peak &peak = m_detectedPeaks[m_selectedPeakIndex];
+    setStatus(QStringLiteral("Peak #%1 preview updated: dx=%2, dy=%3 px; %4% of overlap passes the %5% similarity threshold.")
+                  .arg(m_selectedPeakIndex + 1)
+                  .arg(peak.dx, 0, 'f', 2)
+                  .arg(peak.dy, 0, 'f', 2)
+                  .arg(m_matchedPercent, 0, 'f', 1)
+                  .arg(m_similarityThreshold * 100.0, 0, 'f', 0));
+}
+
 bool PhaseCorrelationEngine::loadGrayFloat(const QUrl &url, cv::Mat &out, QString &error)
 {
     if (!url.isLocalFile()) {
@@ -231,6 +304,28 @@ bool PhaseCorrelationEngine::loadGrayFloat(const QUrl &url, cv::Mat &out, QStrin
     cv::Mat view(image.height(), image.width(), CV_8UC1,
                  image.bits(), static_cast<size_t>(image.bytesPerLine()));
     view.convertTo(out, CV_32F, 1.0 / 255.0);
+    return true;
+}
+
+bool PhaseCorrelationEngine::loadRgba8(const QUrl &url, cv::Mat &out, QString &error)
+{
+    if (!url.isLocalFile()) {
+        error = QStringLiteral("Only local image files are supported.");
+        return false;
+    }
+
+    QImageReader reader(url.toLocalFile());
+    reader.setAutoTransform(true);
+    QImage image = reader.read();
+    if (image.isNull()) {
+        error = QStringLiteral("Could not load image: %1").arg(reader.errorString());
+        return false;
+    }
+
+    image = image.convertToFormat(QImage::Format_RGBA8888);
+    cv::Mat view(image.height(), image.width(), CV_8UC4,
+                 image.bits(), static_cast<size_t>(image.bytesPerLine()));
+    out = view.clone();
     return true;
 }
 
@@ -392,6 +487,128 @@ bool PhaseCorrelationEngine::writeHeatmap(const cv::Mat &correlation,
     return true;
 }
 
+bool PhaseCorrelationEngine::writeCandidatePreview(const Peak &peak,
+                                                   QString &outputUrl,
+                                                   double &matchedPercent,
+                                                   QString &error)
+{
+    cv::Mat a;
+    cv::Mat b;
+    if (!loadRgba8(QUrl(m_imageAUrl), a, error)) {
+        return false;
+    }
+    if (!loadRgba8(QUrl(m_imageBUrl), b, error)) {
+        return false;
+    }
+    if (a.size() != b.size()) {
+        error = QStringLiteral("Images must have identical dimensions for candidate preview.");
+        return false;
+    }
+
+    const int width = a.cols & ~1;
+    const int height = a.rows & ~1;
+    if (width < 2 || height < 2) {
+        error = QStringLiteral("Images are too small for candidate preview.");
+        return false;
+    }
+    if (width != a.cols || height != a.rows) {
+        a = a(cv::Rect(0, 0, width, height)).clone();
+        b = b(cv::Rect(0, 0, width, height)).clone();
+    }
+
+    // The detected phase-correlation displacement is the translation to apply to
+    // Image B to bring that candidate into Image A's coordinate system.
+    const cv::Mat transform = (cv::Mat_<double>(2, 3) <<
+        1.0, 0.0, peak.dx,
+        0.0, 1.0, peak.dy);
+
+    cv::Mat alignedB;
+    cv::warpAffine(b, alignedB, transform, a.size(), cv::INTER_LINEAR,
+                   cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0, 0));
+
+    cv::Mat sourceMask(b.rows, b.cols, CV_8U, cv::Scalar(255));
+    cv::Mat overlapMask;
+    cv::warpAffine(sourceMask, overlapMask, transform, a.size(), cv::INTER_NEAREST,
+                   cv::BORDER_CONSTANT, cv::Scalar(0));
+
+    cv::Mat preview(a.rows, a.cols, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+    qint64 overlapCount = 0;
+    qint64 matchedCount = 0;
+
+    for (int y = 0; y < a.rows; ++y) {
+        const cv::Vec4b *rowA = a.ptr<cv::Vec4b>(y);
+        const cv::Vec4b *rowB = alignedB.ptr<cv::Vec4b>(y);
+        const uchar *rowMask = overlapMask.ptr<uchar>(y);
+        cv::Vec4b *rowOut = preview.ptr<cv::Vec4b>(y);
+
+        for (int x = 0; x < a.cols; ++x) {
+            if (rowMask[x] == 0 || rowA[x][3] == 0 || rowB[x][3] == 0) {
+                continue;
+            }
+
+            ++overlapCount;
+            const double rgbDifference = (
+                std::abs(static_cast<int>(rowA[x][0]) - static_cast<int>(rowB[x][0])) +
+                std::abs(static_cast<int>(rowA[x][1]) - static_cast<int>(rowB[x][1])) +
+                std::abs(static_cast<int>(rowA[x][2]) - static_cast<int>(rowB[x][2]))) / (3.0 * 255.0);
+            const double similarity = 1.0 - rgbDifference;
+
+            if (similarity < m_similarityThreshold) {
+                continue;
+            }
+
+            ++matchedCount;
+            rowOut[x][0] = static_cast<uchar>((static_cast<int>(rowA[x][0]) + static_cast<int>(rowB[x][0]) + 1) / 2);
+            rowOut[x][1] = static_cast<uchar>((static_cast<int>(rowA[x][1]) + static_cast<int>(rowB[x][1]) + 1) / 2);
+            rowOut[x][2] = static_cast<uchar>((static_cast<int>(rowA[x][2]) + static_cast<int>(rowB[x][2]) + 1) / 2);
+            rowOut[x][3] = 255;
+        }
+    }
+
+    matchedPercent = overlapCount > 0
+        ? 100.0 * static_cast<double>(matchedCount) / static_cast<double>(overlapCount)
+        : 0.0;
+
+    QImage wrapped(preview.data, preview.cols, preview.rows,
+                   static_cast<qsizetype>(preview.step), QImage::Format_RGBA8888);
+    QImage owned = wrapped.copy();
+
+    const QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    if (tempDir.isEmpty()) {
+        error = QStringLiteral("No writable temporary directory is available.");
+        return false;
+    }
+
+    QDir().mkpath(tempDir);
+    const QString path = QDir(tempDir).filePath(
+        QStringLiteral("phase-correlation-candidate-%1.png").arg(++m_revision));
+    if (!owned.save(path, "PNG")) {
+        error = QStringLiteral("Failed to save the candidate alignment preview.");
+        return false;
+    }
+
+    outputUrl = QUrl::fromLocalFile(path).toString();
+    return true;
+}
+
+bool PhaseCorrelationEngine::refreshSelectedPreview(QString &error)
+{
+    if (m_selectedPeakIndex < 0 || m_selectedPeakIndex >= m_detectedPeaks.size()) {
+        error = QStringLiteral("No peak candidate is selected.");
+        return false;
+    }
+
+    QString outputUrl;
+    double matchedPercent = 0.0;
+    if (!writeCandidatePreview(m_detectedPeaks[m_selectedPeakIndex], outputUrl, matchedPercent, error)) {
+        return false;
+    }
+
+    m_previewUrl = outputUrl;
+    m_matchedPercent = matchedPercent;
+    return true;
+}
+
 void PhaseCorrelationEngine::setStatus(const QString &message)
 {
     if (m_statusMessage == message) return;
@@ -401,12 +618,22 @@ void PhaseCorrelationEngine::setStatus(const QString &message)
 
 void PhaseCorrelationEngine::clearResult()
 {
-    const bool hadContent = m_hasResult || !m_heatmapUrl.isEmpty() || !m_peaks.isEmpty();
+    const bool hadResultContent = m_hasResult || !m_heatmapUrl.isEmpty() || !m_peaks.isEmpty();
+    const bool hadPreviewContent = !m_previewUrl.isEmpty() || m_selectedPeakIndex >= 0 || !m_detectedPeaks.isEmpty();
+
     m_heatmapUrl.clear();
+    m_previewUrl.clear();
     m_peaks.clear();
+    m_detectedPeaks.clear();
     m_runtimeMs = 0.0;
+    m_matchedPercent = 0.0;
     m_hasResult = false;
-    if (hadContent) {
+    m_selectedPeakIndex = -1;
+
+    if (hadResultContent) {
         emit resultChanged();
+    }
+    if (hadPreviewContent) {
+        emit previewChanged();
     }
 }

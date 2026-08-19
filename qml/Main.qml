@@ -24,6 +24,7 @@ ApplicationWindow {
     property color textMuted: "#aeb9c8"
     property color accent: "#78b7ff"
     property color accentSoft: "#1f78b7ff"
+    property int resultViewIndex: 0
 
     palette.window: panel
     palette.windowText: textMain
@@ -245,7 +246,7 @@ ApplicationWindow {
                 }
 
                 Text {
-                    text: "Compare two same-sized frames and inspect the full 2D phase-correlation response."
+                    text: "Compare two same-sized frames, inspect the correlation surface, then verify individual shift candidates."
                     color: root.textMuted
                     font.pixelSize: 14
                 }
@@ -263,7 +264,7 @@ ApplicationWindow {
                 Text {
                     id: statusText
                     anchors.centerIn: parent
-                    text: correlationEngine.hasResult ? "Heatmap ready" : "Awaiting analysis"
+                    text: correlationEngine.hasResult ? "Results ready" : "Awaiting analysis"
                     color: correlationEngine.hasResult ? "#a9d4ff" : root.textMuted
                     font.pixelSize: 12
                     font.weight: Font.Medium
@@ -283,125 +284,144 @@ ApplicationWindow {
             Layout.fillHeight: true
             spacing: 14
 
-            ColumnLayout {
+            SplitView {
+                id: resultSplit
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 14
+                orientation: Qt.Vertical
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 226
-                    spacing: 14
+                handle: Rectangle {
+                    implicitHeight: 10
+                    color: "transparent"
 
-                    Card {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 58
+                        height: 3
+                        radius: 2
+                        color: root.borderStrong
+                    }
+                }
 
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            spacing: 8
+                Item {
+                    SplitView.minimumHeight: 180
+                    SplitView.preferredHeight: 225
+                    SplitView.maximumHeight: 310
 
-                            RowLayout {
-                                Layout.fillWidth: true
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 14
 
-                                ColumnLayout {
-                                    spacing: 0
-                                    Text {
-                                        text: "Image A"
-                                        color: root.textMain
-                                        font.weight: Font.DemiBold
+                        Card {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                spacing: 8
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+
+                                    ColumnLayout {
+                                        spacing: 0
+                                        Text {
+                                            text: "Image A"
+                                            color: root.textMain
+                                            font.weight: Font.DemiBold
+                                        }
+                                        Text {
+                                            text: "Reference frame"
+                                            color: root.textMuted
+                                            font.pixelSize: 11
+                                        }
                                     }
+
+                                    Item { Layout.fillWidth: true }
+                                    ActionButton { text: "Load"; onClicked: imageADialog.open() }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 8
+                                    color: root.field
+                                    border.color: "#2c3541"
+                                    clip: true
+
+                                    Image {
+                                        anchors.fill: parent
+                                        anchors.margins: 6
+                                        source: correlationEngine.imageAUrl
+                                        fillMode: Image.PreserveAspectFit
+                                        asynchronous: true
+                                    }
+
                                     Text {
-                                        text: "Reference frame"
+                                        anchors.centerIn: parent
+                                        visible: correlationEngine.imageAUrl.length === 0
+                                        text: "Drop or load image A"
                                         color: root.textMuted
-                                        font.pixelSize: 11
+                                        font.pixelSize: 13
                                     }
-                                }
-
-                                Item { Layout.fillWidth: true }
-                                ActionButton { text: "Load"; onClicked: imageADialog.open() }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                radius: 8
-                                color: root.field
-                                border.color: "#2c3541"
-                                clip: true
-
-                                Image {
-                                    anchors.fill: parent
-                                    anchors.margins: 6
-                                    source: correlationEngine.imageAUrl
-                                    fillMode: Image.PreserveAspectFit
-                                    asynchronous: true
-                                }
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    visible: correlationEngine.imageAUrl.length === 0
-                                    text: "Drop or load image A"
-                                    color: root.textMuted
-                                    font.pixelSize: 13
                                 }
                             }
                         }
-                    }
 
-                    Card {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        Card {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
 
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            spacing: 8
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                spacing: 8
 
-                            RowLayout {
-                                Layout.fillWidth: true
+                                RowLayout {
+                                    Layout.fillWidth: true
 
-                                ColumnLayout {
-                                    spacing: 0
-                                    Text {
-                                        text: "Image B"
-                                        color: root.textMain
-                                        font.weight: Font.DemiBold
+                                    ColumnLayout {
+                                        spacing: 0
+                                        Text {
+                                            text: "Image B"
+                                            color: root.textMain
+                                            font.weight: Font.DemiBold
+                                        }
+                                        Text {
+                                            text: "Shifted frame"
+                                            color: root.textMuted
+                                            font.pixelSize: 11
+                                        }
                                     }
+
+                                    Item { Layout.fillWidth: true }
+                                    ActionButton { text: "Load"; onClicked: imageBDialog.open() }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 8
+                                    color: root.field
+                                    border.color: "#2c3541"
+                                    clip: true
+
+                                    Image {
+                                        anchors.fill: parent
+                                        anchors.margins: 6
+                                        source: correlationEngine.imageBUrl
+                                        fillMode: Image.PreserveAspectFit
+                                        asynchronous: true
+                                    }
+
                                     Text {
-                                        text: "Shifted frame"
+                                        anchors.centerIn: parent
+                                        visible: correlationEngine.imageBUrl.length === 0
+                                        text: "Drop or load image B"
                                         color: root.textMuted
-                                        font.pixelSize: 11
+                                        font.pixelSize: 13
                                     }
-                                }
-
-                                Item { Layout.fillWidth: true }
-                                ActionButton { text: "Load"; onClicked: imageBDialog.open() }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                radius: 8
-                                color: root.field
-                                border.color: "#2c3541"
-                                clip: true
-
-                                Image {
-                                    anchors.fill: parent
-                                    anchors.margins: 6
-                                    source: correlationEngine.imageBUrl
-                                    fillMode: Image.PreserveAspectFit
-                                    asynchronous: true
-                                }
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    visible: correlationEngine.imageBUrl.length === 0
-                                    text: "Drop or load image B"
-                                    color: root.textMuted
-                                    font.pixelSize: 13
                                 }
                             }
                         }
@@ -409,8 +429,8 @@ ApplicationWindow {
                 }
 
                 Card {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    SplitView.fillHeight: true
+                    SplitView.minimumHeight: 290
 
                     ColumnLayout {
                         anchors.fill: parent
@@ -419,143 +439,305 @@ ApplicationWindow {
 
                         RowLayout {
                             Layout.fillWidth: true
+                            spacing: 8
 
                             ColumnLayout {
+                                Layout.fillWidth: true
                                 spacing: 1
 
                                 Text {
-                                    text: "Phase-correlation heatmap"
+                                    text: root.resultViewIndex === 0 ? "Phase-correlation heatmap" : "Selected-candidate match preview"
                                     color: root.textMain
                                     font.pixelSize: 17
                                     font.weight: Font.DemiBold
                                 }
 
                                 Text {
-                                    text: "2D inverse-FFT response; brighter/hotter regions indicate stronger translation candidates."
+                                    Layout.fillWidth: true
+                                    text: root.resultViewIndex === 0
+                                          ? "2D inverse-FFT response; hotter regions indicate stronger translation candidates."
+                                          : "Image B is shifted by the selected peak. Only overlapping pixels above the RGB similarity threshold remain visible."
                                     color: root.textMuted
                                     font.pixelSize: 12
+                                    elide: Text.ElideRight
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
-
-                            Rectangle {
-                                visible: correlationEngine.hasResult && correlationEngine.peaks.length > 0
-                                implicitWidth: bestShiftText.implicitWidth + 18
-                                implicitHeight: 30
-                                radius: 7
-                                color: "#12263a"
-                                border.color: "#315d86"
-
-                                Text {
-                                    id: bestShiftText
-                                    anchors.centerIn: parent
-                                    text: correlationEngine.peaks.length > 0
-                                          ? "Best: dx " + Number(correlationEngine.peaks[0].dx).toFixed(2)
-                                            + ", dy " + Number(correlationEngine.peaks[0].dy).toFixed(2)
-                                          : ""
-                                    color: "#b9dcff"
-                                    font.pixelSize: 12
-                                    font.weight: Font.Medium
-                                }
+                            ActionButton {
+                                text: "Heatmap"
+                                primary: root.resultViewIndex === 0
+                                onClicked: root.resultViewIndex = 0
                             }
 
-                            Text {
-                                visible: correlationEngine.hasResult
-                                text: correlationEngine.runtimeMs.toFixed(2) + " ms"
-                                color: root.textMuted
-                                font.pixelSize: 12
+                            ActionButton {
+                                text: "Match preview"
+                                primary: root.resultViewIndex === 1
+                                enabled: correlationEngine.hasResult
+                                onClicked: root.resultViewIndex = 1
                             }
                         }
 
-                        Rectangle {
+                        StackLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            radius: 10
-                            color: "#080b0f"
-                            border.color: correlationEngine.hasResult ? "#46627e" : "#26303b"
-                            border.width: 1
-                            clip: true
+                            currentIndex: root.resultViewIndex
 
-                            Rectangle {
-                                anchors.fill: parent
-                                anchors.margins: 8
-                                radius: 6
-                                color: "#06080b"
-                                border.color: "#1f2832"
-                                clip: true
-
-                                Image {
+                            Item {
+                                ColumnLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 4
-                                    source: correlationEngine.heatmapUrl
-                                    fillMode: Image.PreserveAspectFit
-                                    cache: false
-                                    asynchronous: true
-                                }
+                                    spacing: 8
 
-                                Column {
-                                    anchors.centerIn: parent
-                                    spacing: 7
-                                    visible: !correlationEngine.hasResult
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        radius: 10
+                                        color: "#080b0f"
+                                        border.color: correlationEngine.hasResult ? "#46627e" : "#26303b"
+                                        border.width: 1
+                                        clip: true
 
-                                    Text {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        text: "No heatmap yet"
-                                        color: root.textMain
-                                        font.pixelSize: 16
-                                        font.weight: Font.DemiBold
+                                        Image {
+                                            anchors.fill: parent
+                                            anchors.margins: 8
+                                            source: correlationEngine.heatmapUrl
+                                            fillMode: Image.PreserveAspectFit
+                                            cache: false
+                                            asynchronous: true
+                                        }
+
+                                        Column {
+                                            anchors.centerIn: parent
+                                            spacing: 7
+                                            visible: !correlationEngine.hasResult
+
+                                            Text {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                text: "No heatmap yet"
+                                                color: root.textMain
+                                                font.pixelSize: 16
+                                                font.weight: Font.DemiBold
+                                            }
+
+                                            Text {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                text: "Load two images, then run Analyze"
+                                                color: root.textMuted
+                                                font.pixelSize: 13
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        visible: correlationEngine.hasResult
+                                        spacing: 9
+
+                                        Text { text: "Low"; color: root.textMuted; font.pixelSize: 11 }
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 9
+                                            radius: 4
+                                            gradient: Gradient {
+                                                orientation: Gradient.Horizontal
+                                                GradientStop { position: 0.00; color: "#30123b" }
+                                                GradientStop { position: 0.20; color: "#4669e8" }
+                                                GradientStop { position: 0.40; color: "#1bcfd4" }
+                                                GradientStop { position: 0.60; color: "#a4fc3c" }
+                                                GradientStop { position: 0.80; color: "#f9b41b" }
+                                                GradientStop { position: 1.00; color: "#b40426" }
+                                            }
+                                        }
+
+                                        Text { text: "High"; color: root.textMuted; font.pixelSize: 11 }
                                     }
 
                                     Text {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        text: "Load two images, then run Analyze"
+                                        Layout.fillWidth: true
+                                        text: "White cross = zero shift. Numbered white rings = ranked peaks. The optional white rectangle is the active translation-search region."
                                         color: root.textMuted
-                                        font.pixelSize: 13
+                                        font.pixelSize: 11
+                                        wrapMode: Text.Wrap
                                     }
                                 }
                             }
-                        }
 
-                        RowLayout {
-                            Layout.fillWidth: true
-                            visible: correlationEngine.hasResult
-                            spacing: 9
+                            Item {
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    spacing: 8
 
-                            Text {
-                                text: "Low"
-                                color: root.textMuted
-                                font.pixelSize: 11
-                            }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        visible: correlationEngine.selectedPeakIndex >= 0
+                                        spacing: 10
 
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 9
-                                radius: 4
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.00; color: "#30123b" }
-                                    GradientStop { position: 0.20; color: "#4669e8" }
-                                    GradientStop { position: 0.40; color: "#1bcfd4" }
-                                    GradientStop { position: 0.60; color: "#a4fc3c" }
-                                    GradientStop { position: 0.80; color: "#f9b41b" }
-                                    GradientStop { position: 1.00; color: "#b40426" }
+                                        Rectangle {
+                                            implicitWidth: selectedPeakText.implicitWidth + 18
+                                            implicitHeight: 28
+                                            radius: 7
+                                            color: "#12263a"
+                                            border.color: "#315d86"
+
+                                            Text {
+                                                id: selectedPeakText
+                                                anchors.centerIn: parent
+                                                text: correlationEngine.selectedPeakIndex >= 0
+                                                      ? "Peak #" + (correlationEngine.selectedPeakIndex + 1)
+                                                      : "No peak"
+                                                color: "#b9dcff"
+                                                font.pixelSize: 12
+                                                font.weight: Font.Medium
+                                            }
+                                        }
+
+                                        Text {
+                                            text: correlationEngine.selectedPeakIndex >= 0 && correlationEngine.peaks.length > correlationEngine.selectedPeakIndex
+                                                  ? "dx " + Number(correlationEngine.peaks[correlationEngine.selectedPeakIndex].dx).toFixed(2)
+                                                    + " px   dy " + Number(correlationEngine.peaks[correlationEngine.selectedPeakIndex].dy).toFixed(2) + " px"
+                                                  : ""
+                                            color: root.textMain
+                                            font.pixelSize: 12
+                                        }
+
+                                        Item { Layout.fillWidth: true }
+
+                                        Text {
+                                            text: correlationEngine.matchedPercent.toFixed(1) + "% matched"
+                                            color: root.accent
+                                            font.pixelSize: 12
+                                            font.weight: Font.DemiBold
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        radius: 10
+                                        color: "#05070a"
+                                        border.color: correlationEngine.previewUrl.length > 0 ? "#46627e" : "#26303b"
+                                        border.width: 1
+                                        clip: true
+
+                                        Image {
+                                            anchors.fill: parent
+                                            anchors.margins: 8
+                                            source: correlationEngine.previewUrl
+                                            fillMode: Image.PreserveAspectFit
+                                            cache: false
+                                            asynchronous: true
+                                        }
+
+                                        Column {
+                                            anchors.centerIn: parent
+                                            spacing: 7
+                                            visible: correlationEngine.previewUrl.length === 0
+
+                                            Text {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                text: correlationEngine.hasResult ? "Select a detected peak" : "No candidate preview yet"
+                                                color: root.textMain
+                                                font.pixelSize: 16
+                                                font.weight: Font.DemiBold
+                                            }
+
+                                            Text {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                text: correlationEngine.hasResult
+                                                      ? "Click a peak card on the right"
+                                                      : "Run Analyze first"
+                                                color: root.textMuted
+                                                font.pixelSize: 13
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 10
+
+                                        Text {
+                                            text: "Similarity"
+                                            color: root.textMuted
+                                            font.pixelSize: 12
+                                        }
+
+                                        Slider {
+                                            id: similaritySlider
+                                            Layout.fillWidth: true
+                                            from: 0.50
+                                            to: 1.00
+                                            stepSize: 0.01
+                                            value: correlationEngine.similarityThreshold
+                                            enabled: correlationEngine.hasResult
+
+                                            onMoved: thresholdUpdateTimer.restart()
+
+                                            background: Rectangle {
+                                                x: similaritySlider.leftPadding
+                                                y: similaritySlider.topPadding + similaritySlider.availableHeight / 2 - height / 2
+                                                implicitWidth: 200
+                                                implicitHeight: 5
+                                                width: similaritySlider.availableWidth
+                                                height: implicitHeight
+                                                radius: 3
+                                                color: root.panel3
+
+                                                Rectangle {
+                                                    width: similaritySlider.visualPosition * parent.width
+                                                    height: parent.height
+                                                    radius: 3
+                                                    color: root.accent
+                                                }
+                                            }
+
+                                            handle: Rectangle {
+                                                x: similaritySlider.leftPadding
+                                                   + similaritySlider.visualPosition * (similaritySlider.availableWidth - width)
+                                                y: similaritySlider.topPadding
+                                                   + similaritySlider.availableHeight / 2 - height / 2
+                                                implicitWidth: 16
+                                                implicitHeight: 16
+                                                radius: 8
+                                                color: similaritySlider.enabled ? root.accent : "#586474"
+                                                border.color: "#b8d9ff"
+                                            }
+
+                                            Timer {
+                                                id: thresholdUpdateTimer
+                                                interval: 180
+                                                repeat: false
+                                                onTriggered: correlationEngine.similarityThreshold = similaritySlider.value
+                                            }
+
+                                            Connections {
+                                                target: correlationEngine
+                                                function onSettingsChanged() {
+                                                    if (!similaritySlider.pressed && !thresholdUpdateTimer.running)
+                                                        similaritySlider.value = correlationEngine.similarityThreshold
+                                                }
+                                            }
+                                        }
+
+                                        Text {
+                                            text: Math.round(similaritySlider.value * 100) + "%"
+                                            color: root.textMain
+                                            font.pixelSize: 12
+                                            font.weight: Font.Medium
+                                            Layout.preferredWidth: 38
+                                            horizontalAlignment: Text.AlignRight
+                                        }
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: "Transparent/black areas failed the threshold or lie outside the translated overlap. Visible pixels are the average of Image A and aligned Image B."
+                                        color: root.textMuted
+                                        font.pixelSize: 11
+                                        wrapMode: Text.Wrap
+                                    }
                                 }
                             }
-
-                            Text {
-                                text: "High"
-                                color: root.textMuted
-                                font.pixelSize: 11
-                            }
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: "White cross = zero shift. Numbered white rings = ranked local peaks. The optional white rectangle is the active translation-search region."
-                            color: root.textMuted
-                            font.pixelSize: 11
-                            wrapMode: Text.Wrap
                         }
                     }
                 }
@@ -566,12 +748,14 @@ ApplicationWindow {
                 Layout.fillHeight: true
 
                 ScrollView {
+                    id: settingsScroll
                     anchors.fill: parent
                     anchors.margins: 14
                     clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                     ColumnLayout {
-                        width: parent.width
+                        width: settingsScroll.availableWidth
                         spacing: 12
 
                         Text {
@@ -583,7 +767,7 @@ ApplicationWindow {
 
                         Text {
                             Layout.fillWidth: true
-                            text: "Tune the correlation surface and the peak search without changing the input images."
+                            text: "Tune the correlation surface and peak search, then click any detected peak to inspect its alignment."
                             color: root.textMuted
                             font.pixelSize: 12
                             wrapMode: Text.Wrap
@@ -679,11 +863,19 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
 
-                            Text {
-                                text: "Detected peaks"
-                                color: root.textMain
-                                font.pixelSize: 17
-                                font.weight: Font.DemiBold
+                            ColumnLayout {
+                                spacing: 1
+                                Text {
+                                    text: "Detected peaks"
+                                    color: root.textMain
+                                    font.pixelSize: 17
+                                    font.weight: Font.DemiBold
+                                }
+                                Text {
+                                    text: "Click a candidate to inspect it"
+                                    color: root.textMuted
+                                    font.pixelSize: 11
+                                }
                             }
 
                             Item { Layout.fillWidth: true }
@@ -709,12 +901,24 @@ ApplicationWindow {
                             model: correlationEngine.peaks
 
                             delegate: Rectangle {
+                                id: peakCard
                                 required property var modelData
+                                property bool selected: correlationEngine.selectedPeakIndex === modelData.rank - 1
+
                                 Layout.fillWidth: true
-                                implicitHeight: 86
+                                implicitHeight: 88
                                 radius: 9
-                                color: modelData.rank === 1 ? "#1d2a37" : root.panel2
-                                border.color: modelData.rank === 1 ? "#4a779f" : root.border
+                                color: selected ? "#1c3042" : peakHover.hovered ? "#27313d" : root.panel2
+                                border.color: selected ? root.accent : root.border
+                                border.width: selected ? 1.5 : 1
+
+                                HoverHandler { id: peakHover }
+                                TapHandler {
+                                    onTapped: {
+                                        correlationEngine.selectPeak(peakCard.modelData.rank - 1)
+                                        root.resultViewIndex = 1
+                                    }
+                                }
 
                                 ColumnLayout {
                                     anchors.fill: parent
@@ -725,29 +929,31 @@ ApplicationWindow {
                                         Layout.fillWidth: true
 
                                         Text {
-                                            text: "#" + modelData.rank
-                                            color: modelData.rank === 1 ? root.accent : root.textMain
+                                            text: "#" + peakCard.modelData.rank
+                                            color: peakCard.selected ? root.accent : root.textMain
                                             font.weight: Font.Bold
                                         }
 
                                         Item { Layout.fillWidth: true }
 
                                         Text {
-                                            text: (modelData.relative * 100).toFixed(1) + "% of peak 1"
-                                            color: root.textMuted
+                                            text: peakCard.selected
+                                                  ? "selected"
+                                                  : (peakCard.modelData.relative * 100).toFixed(1) + "% of peak 1"
+                                            color: peakCard.selected ? root.accent : root.textMuted
                                             font.pixelSize: 11
                                         }
                                     }
 
                                     Text {
-                                        text: "dx " + Number(modelData.dx).toFixed(2)
-                                              + " px    dy " + Number(modelData.dy).toFixed(2) + " px"
+                                        text: "dx " + Number(peakCard.modelData.dx).toFixed(2)
+                                              + " px    dy " + Number(peakCard.modelData.dy).toFixed(2) + " px"
                                         color: root.textMain
                                         font.weight: Font.Medium
                                     }
 
                                     Text {
-                                        text: "raw strength " + Number(modelData.strength).toExponential(4)
+                                        text: "raw strength " + Number(peakCard.modelData.strength).toExponential(4)
                                         color: root.textMuted
                                         font.pixelSize: 11
                                     }
