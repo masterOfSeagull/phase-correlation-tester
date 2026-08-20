@@ -15,6 +15,11 @@
 
 namespace {
 constexpr float kMagnitudeEpsilon = 1.0e-12f;
+
+bool nearlyEqual(double left, double right)
+{
+    return std::abs(left - right) < 1.0e-9;
+}
 }
 
 PhaseCorrelationEngine::PhaseCorrelationEngine(QObject *parent)
@@ -285,7 +290,43 @@ void PhaseCorrelationEngine::setSimilarityThreshold(double value)
                   .arg(m_similarityThreshold * 100.0, 0, 'f', 0));
 }
 
-bool PhaseCorrelationEngine::loadGrayFloat(const QUrl &url, cv::Mat &out, QString &error)
+void PhaseCorrelationEngine::setCropLeft(double value)
+{
+    value = std::clamp(value, 0.0, 1.0);
+    if (nearlyEqual(m_cropLeft, value)) return;
+    m_cropLeft = value;
+    clearResult();
+    emit settingsChanged();
+}
+
+void PhaseCorrelationEngine::setCropTop(double value)
+{
+    value = std::clamp(value, 0.0, 1.0);
+    if (nearlyEqual(m_cropTop, value)) return;
+    m_cropTop = value;
+    clearResult();
+    emit settingsChanged();
+}
+
+void PhaseCorrelationEngine::setCropRight(double value)
+{
+    value = std::clamp(value, 0.0, 1.0);
+    if (nearlyEqual(m_cropRight, value)) return;
+    m_cropRight = value;
+    clearResult();
+    emit settingsChanged();
+}
+
+void PhaseCorrelationEngine::setCropBottom(double value)
+{
+    value = std::clamp(value, 0.0, 1.0);
+    if (nearlyEqual(m_cropBottom, value)) return;
+    m_cropBottom = value;
+    clearResult();
+    emit settingsChanged();
+}
+
+bool PhaseCorrelationEngine::loadGrayFloat(const QUrl &url, cv::Mat &out, QString &error) const
 {
     if (!url.isLocalFile()) {
         error = QStringLiteral("Only local image files are supported.");
@@ -304,10 +345,10 @@ bool PhaseCorrelationEngine::loadGrayFloat(const QUrl &url, cv::Mat &out, QStrin
     cv::Mat view(image.height(), image.width(), CV_8UC1,
                  image.bits(), static_cast<size_t>(image.bytesPerLine()));
     view.convertTo(out, CV_32F, 1.0 / 255.0);
-    return true;
+    return applyCrop(out, error);
 }
 
-bool PhaseCorrelationEngine::loadRgba8(const QUrl &url, cv::Mat &out, QString &error)
+bool PhaseCorrelationEngine::loadRgba8(const QUrl &url, cv::Mat &out, QString &error) const
 {
     if (!url.isLocalFile()) {
         error = QStringLiteral("Only local image files are supported.");
@@ -326,6 +367,27 @@ bool PhaseCorrelationEngine::loadRgba8(const QUrl &url, cv::Mat &out, QString &e
     cv::Mat view(image.height(), image.width(), CV_8UC4,
                  image.bits(), static_cast<size_t>(image.bytesPerLine()));
     out = view.clone();
+    return applyCrop(out, error);
+}
+
+bool PhaseCorrelationEngine::applyCrop(cv::Mat &matrix, QString &error) const
+{
+    if (matrix.empty()) {
+        error = QStringLiteral("Loaded image is empty.");
+        return false;
+    }
+
+    if (m_cropLeft >= m_cropRight || m_cropTop >= m_cropBottom) {
+        error = QStringLiteral("Crop bounds must satisfy L < R and T < B.");
+        return false;
+    }
+
+    const int left = std::clamp(static_cast<int>(std::floor(m_cropLeft * matrix.cols)), 0, matrix.cols - 1);
+    const int top = std::clamp(static_cast<int>(std::floor(m_cropTop * matrix.rows)), 0, matrix.rows - 1);
+    const int right = std::clamp(static_cast<int>(std::ceil(m_cropRight * matrix.cols)), left + 1, matrix.cols);
+    const int bottom = std::clamp(static_cast<int>(std::ceil(m_cropBottom * matrix.rows)), top + 1, matrix.rows);
+
+    matrix = matrix(cv::Rect(left, top, right - left, bottom - top)).clone();
     return true;
 }
 

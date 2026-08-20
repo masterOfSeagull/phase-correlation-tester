@@ -53,6 +53,10 @@ ApplicationWindow {
             correlationEngine.setImageB(urls[0])
     }
 
+    function cropText(value) {
+        return Number(value).toFixed(3).replace(/\.?0+$/, "")
+    }
+
     FileDialog {
         id: imageADialog
         title: "Choose Image A"
@@ -772,6 +776,70 @@ ApplicationWindow {
                             color: root.textMuted
                             font.pixelSize: 12
                             wrapMode: Text.Wrap
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 136
+                            radius: 9
+                            color: root.panel2
+                            border.color: root.border
+
+                            GridLayout {
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                columns: 2
+                                rowSpacing: 8
+                                columnSpacing: 10
+
+                                Text { text: "Crop L"; color: root.textMuted }
+                                StyledTextField {
+                                    Layout.fillWidth: true
+                                    text: root.cropText(correlationEngine.cropLeft)
+                                    validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                    onEditingFinished: {
+                                        correlationEngine.cropLeft = parseFloat(text || "0")
+                                        text = root.cropText(correlationEngine.cropLeft)
+                                    }
+                                }
+
+                                Text { text: "Crop T"; color: root.textMuted }
+                                StyledTextField {
+                                    Layout.fillWidth: true
+                                    text: root.cropText(correlationEngine.cropTop)
+                                    validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                    onEditingFinished: {
+                                        correlationEngine.cropTop = parseFloat(text || "0")
+                                        text = root.cropText(correlationEngine.cropTop)
+                                    }
+                                }
+
+                                Text { text: "Crop R"; color: root.textMuted }
+                                StyledTextField {
+                                    Layout.fillWidth: true
+                                    text: root.cropText(correlationEngine.cropRight)
+                                    validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                    onEditingFinished: {
+                                        correlationEngine.cropRight = parseFloat(text || "1")
+                                        text = root.cropText(correlationEngine.cropRight)
+                                    }
+                                }
+
+                                Text { text: "Crop B"; color: root.textMuted }
+                                StyledTextField {
+                                    Layout.fillWidth: true
+                                    text: root.cropText(correlationEngine.cropBottom)
+                                    validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                    onEditingFinished: {
+                                        correlationEngine.cropBottom = parseFloat(text || "1")
+                                        text = root.cropText(correlationEngine.cropBottom)
+                                    }
+                                }
+                            }
                         }
 
                         StyledCheckBox {

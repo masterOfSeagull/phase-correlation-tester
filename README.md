@@ -14,6 +14,7 @@ The primary use case is scenes where more than one coherent translation may exis
 - Raw correlation strength and strength relative to peak #1.
 - Configurable suppression radius so one broad peak is not mistaken for several independent peaks.
 - Optional `±X / ±Y` translation search bounds.
+- Optional normalized crop bounds `L/T/R/B`, where `0,0,1,1` uses the full image.
 - Optional Hann window.
 - Analysis runtime.
 - Drag-and-drop image loading: one image fills the next empty slot; dropping two
@@ -30,15 +31,16 @@ It seeks once to the requested start point, then decodes forward sequentially an
 ## Algorithm
 
 1. Load both images as grayscale `float32`.
-2. Optionally multiply both by a 2D Hann window.
-3. Compute the two 2D DFTs with OpenCV's optimized DFT backend.
-4. Form `F1 * conj(F2)`.
-5. Divide each complex bin by its magnitude, retaining phase only.
-6. Inverse DFT to obtain the phase-correlation surface.
-7. Shift zero displacement to the center of the surface.
-8. Find the strongest peak in the allowed translation range.
-9. Suppress a disk around that peak and repeat to find distinct secondary peaks.
-10. Apply a simple 3-point quadratic interpolation independently on X and Y for a subpixel peak estimate.
+2. Apply the optional normalized crop rectangle before correlation.
+3. Optionally multiply both by a 2D Hann window.
+4. Compute the two 2D DFTs with OpenCV's optimized DFT backend.
+5. Form `F1 * conj(F2)`.
+6. Divide each complex bin by its magnitude, retaining phase only.
+7. Inverse DFT to obtain the phase-correlation surface.
+8. Shift zero displacement to the center of the surface.
+9. Find the strongest peak in the allowed translation range.
+10. Suppress a disk around that peak and repeat to find distinct secondary peaks.
+11. Apply a simple 3-point quadratic interpolation independently on X and Y for a subpixel peak estimate.
 
 The phase-correlation logic and multi-peak analysis are implemented in `PhaseCorrelationEngine.cpp`; OpenCV is used as the FFT/DFT backend and for basic matrix/image primitives.
 
@@ -114,6 +116,9 @@ Change **Suppress radius** when peak #2 is merely a neighboring sample of the sa
 ## Current constraints
 
 - Input images must have the same dimensions.
+- Crop bounds are normalized image edges from `0.0` to `1.0`; `L` must be less
+  than `R`, and `T` must be less than `B`. The cropped Image A and Image B
+  regions must still have the same dimensions.
 - Odd image dimensions are cropped by one pixel on the right/bottom for the centered FFT visualization.
 - Translation is circular in the Fourier model, so very large shifts near image boundaries should be interpreted carefully.
 - This version performs global phase correlation. A later useful extension is tiled/local phase correlation to map which image regions vote for each displacement.

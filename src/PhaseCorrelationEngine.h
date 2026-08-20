@@ -28,6 +28,10 @@ class PhaseCorrelationEngine final : public QObject
     Q_PROPERTY(int peakCount READ peakCount WRITE setPeakCount NOTIFY settingsChanged)
     Q_PROPERTY(int suppressionRadius READ suppressionRadius WRITE setSuppressionRadius NOTIFY settingsChanged)
     Q_PROPERTY(double similarityThreshold READ similarityThreshold WRITE setSimilarityThreshold NOTIFY settingsChanged)
+    Q_PROPERTY(double cropLeft READ cropLeft WRITE setCropLeft NOTIFY settingsChanged)
+    Q_PROPERTY(double cropTop READ cropTop WRITE setCropTop NOTIFY settingsChanged)
+    Q_PROPERTY(double cropRight READ cropRight WRITE setCropRight NOTIFY settingsChanged)
+    Q_PROPERTY(double cropBottom READ cropBottom WRITE setCropBottom NOTIFY settingsChanged)
 
 public:
     explicit PhaseCorrelationEngine(QObject *parent = nullptr);
@@ -50,6 +54,10 @@ public:
     int peakCount() const { return m_peakCount; }
     int suppressionRadius() const { return m_suppressionRadius; }
     double similarityThreshold() const { return m_similarityThreshold; }
+    double cropLeft() const { return m_cropLeft; }
+    double cropTop() const { return m_cropTop; }
+    double cropRight() const { return m_cropRight; }
+    double cropBottom() const { return m_cropBottom; }
 
     Q_INVOKABLE bool setImageA(const QUrl &url);
     Q_INVOKABLE bool setImageB(const QUrl &url);
@@ -63,6 +71,10 @@ public:
     void setPeakCount(int value);
     void setSuppressionRadius(int value);
     void setSimilarityThreshold(double value);
+    void setCropLeft(double value);
+    void setCropTop(double value);
+    void setCropRight(double value);
+    void setCropBottom(double value);
 
 signals:
     void imageAChanged();
@@ -81,8 +93,9 @@ private:
         cv::Point integerLocation;
     };
 
-    static bool loadGrayFloat(const QUrl &url, cv::Mat &out, QString &error);
-    static bool loadRgba8(const QUrl &url, cv::Mat &out, QString &error);
+    bool loadGrayFloat(const QUrl &url, cv::Mat &out, QString &error) const;
+    bool loadRgba8(const QUrl &url, cv::Mat &out, QString &error) const;
+    bool applyCrop(cv::Mat &matrix, QString &error) const;
     static void fftShift(cv::Mat &matrix);
     static double subpixelOffset(double left, double center, double right);
 
@@ -112,5 +125,9 @@ private:
     int m_peakCount = 5;
     int m_suppressionRadius = 12;
     double m_similarityThreshold = 0.90;
+    double m_cropLeft = 0.0;
+    double m_cropTop = 0.0;
+    double m_cropRight = 1.0;
+    double m_cropBottom = 1.0;
     quint64 m_revision = 0;
 };
