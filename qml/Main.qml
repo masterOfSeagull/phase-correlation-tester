@@ -780,63 +780,99 @@ ApplicationWindow {
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 136
+                            implicitHeight: 70
                             radius: 9
                             color: root.panel2
                             border.color: root.border
 
-                            GridLayout {
+                            RowLayout {
                                 anchors.fill: parent
                                 anchors.margins: 10
-                                columns: 2
-                                rowSpacing: 8
-                                columnSpacing: 10
+                                spacing: 6
 
-                                Text { text: "Crop L"; color: root.textMuted }
-                                StyledTextField {
+                                Text {
+                                    text: "Crop"
+                                    color: root.textMuted
+                                    font.pixelSize: 12
+                                }
+
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    text: root.cropText(correlationEngine.cropLeft)
-                                    validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
-                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                    onEditingFinished: {
-                                        correlationEngine.cropLeft = parseFloat(text || "0")
-                                        text = root.cropText(correlationEngine.cropLeft)
+                                    spacing: 3
+
+                                    Text { text: "L"; color: root.textMuted; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                                    StyledTextField {
+                                        Layout.fillWidth: true
+                                        text: root.cropText(correlationEngine.cropLeft)
+                                        validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                        horizontalAlignment: TextInput.AlignHCenter
+                                        leftPadding: 4
+                                        rightPadding: 4
+                                        onEditingFinished: {
+                                            correlationEngine.cropLeft = parseFloat(text || "0")
+                                            text = root.cropText(correlationEngine.cropLeft)
+                                        }
                                     }
                                 }
 
-                                Text { text: "Crop T"; color: root.textMuted }
-                                StyledTextField {
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    text: root.cropText(correlationEngine.cropTop)
-                                    validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
-                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                    onEditingFinished: {
-                                        correlationEngine.cropTop = parseFloat(text || "0")
-                                        text = root.cropText(correlationEngine.cropTop)
+                                    spacing: 3
+
+                                    Text { text: "T"; color: root.textMuted; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                                    StyledTextField {
+                                        Layout.fillWidth: true
+                                        text: root.cropText(correlationEngine.cropTop)
+                                        validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                        horizontalAlignment: TextInput.AlignHCenter
+                                        leftPadding: 4
+                                        rightPadding: 4
+                                        onEditingFinished: {
+                                            correlationEngine.cropTop = parseFloat(text || "0")
+                                            text = root.cropText(correlationEngine.cropTop)
+                                        }
                                     }
                                 }
 
-                                Text { text: "Crop R"; color: root.textMuted }
-                                StyledTextField {
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    text: root.cropText(correlationEngine.cropRight)
-                                    validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
-                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                    onEditingFinished: {
-                                        correlationEngine.cropRight = parseFloat(text || "1")
-                                        text = root.cropText(correlationEngine.cropRight)
+                                    spacing: 3
+
+                                    Text { text: "R"; color: root.textMuted; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                                    StyledTextField {
+                                        Layout.fillWidth: true
+                                        text: root.cropText(correlationEngine.cropRight)
+                                        validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                        horizontalAlignment: TextInput.AlignHCenter
+                                        leftPadding: 4
+                                        rightPadding: 4
+                                        onEditingFinished: {
+                                            correlationEngine.cropRight = parseFloat(text || "1")
+                                            text = root.cropText(correlationEngine.cropRight)
+                                        }
                                     }
                                 }
 
-                                Text { text: "Crop B"; color: root.textMuted }
-                                StyledTextField {
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    text: root.cropText(correlationEngine.cropBottom)
-                                    validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
-                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                    onEditingFinished: {
-                                        correlationEngine.cropBottom = parseFloat(text || "1")
-                                        text = root.cropText(correlationEngine.cropBottom)
+                                    spacing: 3
+
+                                    Text { text: "B"; color: root.textMuted; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                                    StyledTextField {
+                                        Layout.fillWidth: true
+                                        text: root.cropText(correlationEngine.cropBottom)
+                                        validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 4; notation: DoubleValidator.StandardNotation }
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                        horizontalAlignment: TextInput.AlignHCenter
+                                        leftPadding: 4
+                                        rightPadding: 4
+                                        onEditingFinished: {
+                                            correlationEngine.cropBottom = parseFloat(text || "1")
+                                            text = root.cropText(correlationEngine.cropBottom)
+                                        }
                                     }
                                 }
                             }

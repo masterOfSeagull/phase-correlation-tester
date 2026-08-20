@@ -103,6 +103,8 @@ private:
     bool writeHeatmap(const cv::Mat &correlation, const QList<Peak> &peaks, QString &outputUrl, QString &error);
     bool writeCandidatePreview(const Peak &peak, QString &outputUrl, double &matchedPercent, QString &error);
     bool refreshSelectedPreview(QString &error);
+    void loadSettings();
+    void saveSettings() const;
     void setStatus(const QString &message);
     void clearResult();
 

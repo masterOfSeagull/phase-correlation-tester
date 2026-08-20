@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 #include <QImage>
 #include <QImageReader>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QVariantMap>
 
@@ -25,6 +26,7 @@ bool nearlyEqual(double left, double right)
 PhaseCorrelationEngine::PhaseCorrelationEngine(QObject *parent)
     : QObject(parent)
 {
+    loadSettings();
 }
 
 bool PhaseCorrelationEngine::setImageA(const QUrl &url)
@@ -217,6 +219,7 @@ void PhaseCorrelationEngine::setHannWindow(bool value)
 {
     if (m_hannWindow == value) return;
     m_hannWindow = value;
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -224,6 +227,7 @@ void PhaseCorrelationEngine::setLimitSearch(bool value)
 {
     if (m_limitSearch == value) return;
     m_limitSearch = value;
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -232,6 +236,7 @@ void PhaseCorrelationEngine::setMaxDx(int value)
     value = std::clamp(value, 0, 16384);
     if (m_maxDx == value) return;
     m_maxDx = value;
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -240,6 +245,7 @@ void PhaseCorrelationEngine::setMaxDy(int value)
     value = std::clamp(value, 0, 16384);
     if (m_maxDy == value) return;
     m_maxDy = value;
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -248,6 +254,7 @@ void PhaseCorrelationEngine::setPeakCount(int value)
     value = std::clamp(value, 1, 20);
     if (m_peakCount == value) return;
     m_peakCount = value;
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -256,6 +263,7 @@ void PhaseCorrelationEngine::setSuppressionRadius(int value)
     value = std::clamp(value, 1, 512);
     if (m_suppressionRadius == value) return;
     m_suppressionRadius = value;
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -265,6 +273,7 @@ void PhaseCorrelationEngine::setSimilarityThreshold(double value)
     if (std::abs(m_similarityThreshold - value) < 1.0e-9) return;
 
     m_similarityThreshold = value;
+    saveSettings();
     emit settingsChanged();
 
     if (!m_hasResult || m_selectedPeakIndex < 0 || m_selectedPeakIndex >= m_detectedPeaks.size()) {
@@ -296,6 +305,7 @@ void PhaseCorrelationEngine::setCropLeft(double value)
     if (nearlyEqual(m_cropLeft, value)) return;
     m_cropLeft = value;
     clearResult();
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -305,6 +315,7 @@ void PhaseCorrelationEngine::setCropTop(double value)
     if (nearlyEqual(m_cropTop, value)) return;
     m_cropTop = value;
     clearResult();
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -314,6 +325,7 @@ void PhaseCorrelationEngine::setCropRight(double value)
     if (nearlyEqual(m_cropRight, value)) return;
     m_cropRight = value;
     clearResult();
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -323,6 +335,7 @@ void PhaseCorrelationEngine::setCropBottom(double value)
     if (nearlyEqual(m_cropBottom, value)) return;
     m_cropBottom = value;
     clearResult();
+    saveSettings();
     emit settingsChanged();
 }
 
@@ -669,6 +682,52 @@ bool PhaseCorrelationEngine::refreshSelectedPreview(QString &error)
     m_previewUrl = outputUrl;
     m_matchedPercent = matchedPercent;
     return true;
+}
+
+void PhaseCorrelationEngine::loadSettings()
+{
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("analysis"));
+
+    m_hannWindow = settings.value(QStringLiteral("hannWindow"), m_hannWindow).toBool();
+    m_limitSearch = settings.value(QStringLiteral("limitSearch"), m_limitSearch).toBool();
+    m_maxDx = std::clamp(settings.value(QStringLiteral("maxDx"), m_maxDx).toInt(), 0, 16384);
+    m_maxDy = std::clamp(settings.value(QStringLiteral("maxDy"), m_maxDy).toInt(), 0, 16384);
+    m_peakCount = std::clamp(settings.value(QStringLiteral("peakCount"), m_peakCount).toInt(), 1, 20);
+    m_suppressionRadius = std::clamp(settings.value(QStringLiteral("suppressionRadius"), m_suppressionRadius).toInt(), 1, 512);
+    m_similarityThreshold = std::clamp(settings.value(QStringLiteral("similarityThreshold"), m_similarityThreshold).toDouble(), 0.0, 1.0);
+
+    m_cropLeft = std::clamp(settings.value(QStringLiteral("cropLeft"), m_cropLeft).toDouble(), 0.0, 1.0);
+    m_cropTop = std::clamp(settings.value(QStringLiteral("cropTop"), m_cropTop).toDouble(), 0.0, 1.0);
+    m_cropRight = std::clamp(settings.value(QStringLiteral("cropRight"), m_cropRight).toDouble(), 0.0, 1.0);
+    m_cropBottom = std::clamp(settings.value(QStringLiteral("cropBottom"), m_cropBottom).toDouble(), 0.0, 1.0);
+
+    if (m_cropLeft >= m_cropRight || m_cropTop >= m_cropBottom) {
+        m_cropLeft = 0.0;
+        m_cropTop = 0.0;
+        m_cropRight = 1.0;
+        m_cropBottom = 1.0;
+    }
+
+    settings.endGroup();
+}
+
+void PhaseCorrelationEngine::saveSettings() const
+{
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("analysis"));
+    settings.setValue(QStringLiteral("hannWindow"), m_hannWindow);
+    settings.setValue(QStringLiteral("limitSearch"), m_limitSearch);
+    settings.setValue(QStringLiteral("maxDx"), m_maxDx);
+    settings.setValue(QStringLiteral("maxDy"), m_maxDy);
+    settings.setValue(QStringLiteral("peakCount"), m_peakCount);
+    settings.setValue(QStringLiteral("suppressionRadius"), m_suppressionRadius);
+    settings.setValue(QStringLiteral("similarityThreshold"), m_similarityThreshold);
+    settings.setValue(QStringLiteral("cropLeft"), m_cropLeft);
+    settings.setValue(QStringLiteral("cropTop"), m_cropTop);
+    settings.setValue(QStringLiteral("cropRight"), m_cropRight);
+    settings.setValue(QStringLiteral("cropBottom"), m_cropBottom);
+    settings.endGroup();
 }
 
 void PhaseCorrelationEngine::setStatus(const QString &message)

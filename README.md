@@ -17,6 +17,7 @@ The primary use case is scenes where more than one coherent translation may exis
 - Optional normalized crop bounds `L/T/R/B`, where `0,0,1,1` uses the full image.
 - Optional Hann window.
 - Analysis runtime.
+- Analysis settings are restored from the previous run.
 - Drag-and-drop image loading: one image fills the next empty slot; dropping two
   or more images assigns the first two to Image A and Image B.
 
