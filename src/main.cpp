@@ -18,6 +18,9 @@ void writeQtMessage(QtMsgType type, const QMessageLogContext &, const QString &m
     if (!logFile || !logFile->isOpen()) {
         return;
     }
+    if (type == QtWarningMsg && message == QStringLiteral("Retrying to obtain clipboard.")) {
+        return;
+    }
 
     const char *level = "info";
     switch (type) {
