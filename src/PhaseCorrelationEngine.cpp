@@ -674,32 +674,50 @@ bool PhaseCorrelationEngine::writeCandidatePreview(double dx,
         b = b(cv::Rect(0, 0, width, height)).clone();
     }
 
+    const int outputLeft = static_cast<int>(std::floor(std::min(0.0, dx)));
+    const int outputTop = static_cast<int>(std::floor(std::min(0.0, dy)));
+    const int outputRight = static_cast<int>(std::ceil(std::max(static_cast<double>(a.cols), dx + static_cast<double>(b.cols))));
+    const int outputBottom = static_cast<int>(std::ceil(std::max(static_cast<double>(a.rows), dy + static_cast<double>(b.rows))));
+    const int outputWidth = outputRight - outputLeft;
+    const int outputHeight = outputBottom - outputTop;
+    if (outputWidth < 1 || outputHeight < 1) {
+        error = QStringLiteral("Preview shift produced an invalid output canvas.");
+        return false;
+    }
+    if (static_cast<qint64>(outputWidth) * static_cast<qint64>(outputHeight) > 200000000) {
+        error = QStringLiteral("Preview shift is too large to render safely.");
+        return false;
+    }
+
+    cv::Mat canvasA(outputHeight, outputWidth, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+    a.copyTo(canvasA(cv::Rect(-outputLeft, -outputTop, a.cols, a.rows)));
+
     // The detected phase-correlation displacement is the translation to apply to
     // Image B to bring that candidate into Image A's coordinate system.
     const cv::Mat transform = (cv::Mat_<double>(2, 3) <<
-        1.0, 0.0, dx,
-        0.0, 1.0, dy);
+        1.0, 0.0, dx - static_cast<double>(outputLeft),
+        0.0, 1.0, dy - static_cast<double>(outputTop));
 
     cv::Mat alignedB;
-    cv::warpAffine(b, alignedB, transform, a.size(), cv::INTER_LINEAR,
+    cv::warpAffine(b, alignedB, transform, canvasA.size(), cv::INTER_LINEAR,
                    cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0, 0));
 
     cv::Mat sourceMask(b.rows, b.cols, CV_8U, cv::Scalar(255));
     cv::Mat overlapMask;
-    cv::warpAffine(sourceMask, overlapMask, transform, a.size(), cv::INTER_NEAREST,
+    cv::warpAffine(sourceMask, overlapMask, transform, canvasA.size(), cv::INTER_NEAREST,
                    cv::BORDER_CONSTANT, cv::Scalar(0));
 
-    cv::Mat preview(a.rows, a.cols, CV_8UC4, cv::Scalar(0, 0, 0, 0));
-    cv::Mat matchMask(a.rows, a.cols, CV_8U, cv::Scalar(0));
+    cv::Mat preview(canvasA.rows, canvasA.cols, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+    cv::Mat matchMask(canvasA.rows, canvasA.cols, CV_8U, cv::Scalar(0));
     qint64 overlapCount = 0;
 
-    for (int y = 0; y < a.rows; ++y) {
-        const cv::Vec4b *rowA = a.ptr<cv::Vec4b>(y);
+    for (int y = 0; y < canvasA.rows; ++y) {
+        const cv::Vec4b *rowA = canvasA.ptr<cv::Vec4b>(y);
         const cv::Vec4b *rowB = alignedB.ptr<cv::Vec4b>(y);
         const uchar *rowMask = overlapMask.ptr<uchar>(y);
         uchar *rowMatch = matchMask.ptr<uchar>(y);
 
-        for (int x = 0; x < a.cols; ++x) {
+        for (int x = 0; x < canvasA.cols; ++x) {
             if (rowMask[x] == 0 || rowA[x][3] == 0 || rowB[x][3] == 0) {
                 continue;
             }
@@ -731,11 +749,11 @@ bool PhaseCorrelationEngine::writeCandidatePreview(double dx,
 
         cv::Mat integral;
         cv::integral(matchMask, integral, CV_32S);
-        continuousMask = cv::Mat(a.rows, a.cols, CV_8U, cv::Scalar(0));
+        continuousMask = cv::Mat(canvasA.rows, canvasA.cols, CV_8U, cv::Scalar(0));
 
-        for (int y = topRadius; y + bottomRadius < a.rows; ++y) {
+        for (int y = topRadius; y + bottomRadius < canvasA.rows; ++y) {
             uchar *rowVisible = continuousMask.ptr<uchar>(y);
-            for (int x = leftRadius; x + rightRadius < a.cols; ++x) {
+            for (int x = leftRadius; x + rightRadius < canvasA.cols; ++x) {
                 const int left = x - leftRadius;
                 const int top = y - topRadius;
                 const int right = x + rightRadius + 1;
@@ -754,14 +772,14 @@ bool PhaseCorrelationEngine::writeCandidatePreview(double dx,
     }
 
     qint64 matchedCount = 0;
-    for (int y = 0; y < a.rows; ++y) {
-        const cv::Vec4b *rowA = a.ptr<cv::Vec4b>(y);
+    for (int y = 0; y < canvasA.rows; ++y) {
+        const cv::Vec4b *rowA = canvasA.ptr<cv::Vec4b>(y);
         const cv::Vec4b *rowB = alignedB.ptr<cv::Vec4b>(y);
         const uchar *rowMask = overlapMask.ptr<uchar>(y);
         const uchar *rowVisible = visibleMask.ptr<uchar>(y);
         cv::Vec4b *rowOut = preview.ptr<cv::Vec4b>(y);
 
-        for (int x = 0; x < a.cols; ++x) {
+        for (int x = 0; x < canvasA.cols; ++x) {
             const bool hasA = rowA[x][3] > 0;
             const bool hasB = rowMask[x] != 0 && rowB[x][3] > 0;
 
@@ -775,17 +793,17 @@ bool PhaseCorrelationEngine::writeCandidatePreview(double dx,
             }
 
             if (hasA && hasB) {
-                rowOut[x][0] = static_cast<uchar>((static_cast<int>(rowA[x][0]) + static_cast<int>(rowB[x][0]) + 1) / 4);
-                rowOut[x][1] = static_cast<uchar>((static_cast<int>(rowA[x][1]) + static_cast<int>(rowB[x][1]) + 1) / 4);
-                rowOut[x][2] = static_cast<uchar>((static_cast<int>(rowA[x][2]) + static_cast<int>(rowB[x][2]) + 1) / 4);
-                rowOut[x][3] = 180;
+                rowOut[x][0] = 0;
+                rowOut[x][1] = 0;
+                rowOut[x][2] = 0;
+                rowOut[x][3] = 255;
                 continue;
             }
 
             if (hasA) {
-                rowOut[x][0] = static_cast<uchar>(std::min(255, 48 + static_cast<int>(rowA[x][0]) / 3));
+                rowOut[x][0] = static_cast<uchar>(static_cast<int>(rowA[x][0]) / 4);
                 rowOut[x][1] = static_cast<uchar>(static_cast<int>(rowA[x][1]) / 4);
-                rowOut[x][2] = static_cast<uchar>(static_cast<int>(rowA[x][2]) / 4);
+                rowOut[x][2] = static_cast<uchar>(std::min(255, 48 + static_cast<int>(rowA[x][2]) / 3));
                 rowOut[x][3] = 210;
                 continue;
             }

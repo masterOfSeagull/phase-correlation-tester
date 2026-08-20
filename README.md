@@ -13,7 +13,7 @@ The primary use case is scenes where more than one coherent translation may exis
 - `dx`, `dy` for each peak. These are the translations to apply to **Image B to align it to Image A**.
 - Raw correlation strength and strength relative to peak #1.
 - Candidate match preview with optional custom `dx`/`dy`, continuous `N x N`
-  similarity filtering, non-overlap context, and Ctrl+wheel pixel zoom.
+  similarity filtering, expanded non-overlap context, and Ctrl+wheel pixel zoom.
 - Configurable suppression radius so one broad peak is not mistaken for several independent peaks.
 - Optional `±X / ±Y` translation search bounds.
 - Optional normalized crop bounds `L/T/R/B`, where `0,0,1,1` uses the full image.

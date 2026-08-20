@@ -913,7 +913,7 @@ ApplicationWindow {
 
                                     Text {
                                         Layout.fillWidth: true
-                                        text: "Bright pixels pass the match filter. Dim blended pixels are rejected overlap; red-tinted pixels are A-only, blue-tinted pixels are shifted B-only. Ctrl+wheel zooms the preview."
+                                        text: "Bright pixels pass the match filter. Black pixels are rejected overlap. Blue-tinted pixels are non-overlapping extension from either image. Ctrl+wheel zooms the preview."
                                         color: root.textMuted
                                         font.pixelSize: 11
                                         wrapMode: Text.Wrap
