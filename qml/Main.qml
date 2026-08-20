@@ -25,6 +25,7 @@ ApplicationWindow {
     property color accent: "#78b7ff"
     property color accentSoft: "#1f78b7ff"
     property int resultViewIndex: 0
+    property real previewZoom: 1.0
 
     palette.window: panel
     palette.windowText: textMain
@@ -615,6 +616,76 @@ ApplicationWindow {
                                         }
                                     }
 
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        StyledCheckBox {
+                                            text: "Custom shift"
+                                            checked: correlationEngine.customPreviewShift
+                                            enabled: correlationEngine.imageAUrl.length > 0 && correlationEngine.imageBUrl.length > 0
+                                            onToggled: correlationEngine.customPreviewShift = checked
+                                        }
+
+                                        Text {
+                                            text: "dx"
+                                            color: root.textMuted
+                                            font.pixelSize: 12
+                                        }
+
+                                        StyledTextField {
+                                            Layout.preferredWidth: 72
+                                            text: Number(correlationEngine.previewDx).toFixed(2)
+                                            enabled: correlationEngine.customPreviewShift
+                                            validator: DoubleValidator { bottom: -100000.0; top: 100000.0; decimals: 3; notation: DoubleValidator.StandardNotation }
+                                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                            onEditingFinished: {
+                                                correlationEngine.previewDx = parseFloat(text || "0")
+                                                text = Number(correlationEngine.previewDx).toFixed(2)
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "dy"
+                                            color: root.textMuted
+                                            font.pixelSize: 12
+                                        }
+
+                                        StyledTextField {
+                                            Layout.preferredWidth: 72
+                                            text: Number(correlationEngine.previewDy).toFixed(2)
+                                            enabled: correlationEngine.customPreviewShift
+                                            validator: DoubleValidator { bottom: -100000.0; top: 100000.0; decimals: 3; notation: DoubleValidator.StandardNotation }
+                                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                            onEditingFinished: {
+                                                correlationEngine.previewDy = parseFloat(text || "0")
+                                                text = Number(correlationEngine.previewDy).toFixed(2)
+                                            }
+                                        }
+
+                                        ActionButton {
+                                            text: "Apply"
+                                            enabled: correlationEngine.imageAUrl.length > 0 && correlationEngine.imageBUrl.length > 0
+                                            onClicked: correlationEngine.refreshPreview()
+                                        }
+
+                                        Item { Layout.fillWidth: true }
+
+                                        Text {
+                                            text: "Zoom " + root.previewZoom.toFixed(root.previewZoom < 10 ? 1 : 0) + "x"
+                                            color: root.textMuted
+                                            font.pixelSize: 12
+                                        }
+
+                                        ActionButton {
+                                            text: "Reset"
+                                            implicitWidth: 64
+                                            onClicked: {
+                                                root.previewZoom = 1.0
+                                            }
+                                        }
+                                    }
+
                                     Rectangle {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
@@ -624,13 +695,84 @@ ApplicationWindow {
                                         border.width: 1
                                         clip: true
 
-                                        Image {
+                                        Flickable {
+                                            id: previewFlick
                                             anchors.fill: parent
                                             anchors.margins: 8
-                                            source: correlationEngine.previewUrl
-                                            fillMode: Image.PreserveAspectFit
-                                            cache: false
-                                            asynchronous: true
+                                            clip: true
+                                            contentWidth: Math.max(width, previewImage.width)
+                                            contentHeight: Math.max(height, previewImage.height)
+                                            boundsBehavior: Flickable.StopAtBounds
+                                            visible: correlationEngine.previewUrl.length > 0
+
+                                            WheelHandler {
+                                                acceptedModifiers: Qt.ControlModifier
+                                                onWheel: function(wheel) {
+                                                    var oldZoom = root.previewZoom
+                                                    var factor = wheel.angleDelta.y > 0 ? 1.25 : 0.8
+                                                    root.previewZoom = Math.max(1.0, Math.min(64.0, root.previewZoom * factor))
+                                                    if (root.previewZoom !== oldZoom) {
+                                                        wheel.accepted = true
+                                                        previewGrid.requestPaint()
+                                                    }
+                                                }
+                                            }
+
+                                            Image {
+                                                id: previewImage
+                                                property real fitScale: sourceSize.width > 0 && sourceSize.height > 0
+                                                    ? Math.min((previewFlick.width - 2) / sourceSize.width,
+                                                               (previewFlick.height - 2) / sourceSize.height)
+                                                    : 1.0
+
+                                                x: Math.max(0, (previewFlick.width - width) / 2)
+                                                y: Math.max(0, (previewFlick.height - height) / 2)
+                                                width: Math.max(1, sourceSize.width * fitScale * root.previewZoom)
+                                                height: Math.max(1, sourceSize.height * fitScale * root.previewZoom)
+                                                source: correlationEngine.previewUrl
+                                                fillMode: Image.Stretch
+                                                cache: false
+                                                asynchronous: true
+                                                smooth: false
+                                                mipmap: false
+
+                                                onStatusChanged: previewGrid.requestPaint()
+                                                onWidthChanged: previewGrid.requestPaint()
+                                                onHeightChanged: previewGrid.requestPaint()
+
+                                                Canvas {
+                                                    id: previewGrid
+                                                    anchors.fill: parent
+                                                    visible: previewImage.sourceSize.width > 0
+                                                             && root.previewZoom * previewImage.fitScale >= 6.0
+
+                                                    onVisibleChanged: requestPaint()
+                                                    onPaint: {
+                                                        var ctx = getContext("2d")
+                                                        ctx.clearRect(0, 0, width, height)
+                                                        if (!visible)
+                                                            return
+
+                                                        var cellW = width / previewImage.sourceSize.width
+                                                        var cellH = height / previewImage.sourceSize.height
+                                                        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"
+                                                        ctx.lineWidth = 1
+
+                                                        ctx.beginPath()
+                                                        for (var x = 0; x <= previewImage.sourceSize.width; ++x) {
+                                                            var px = Math.round(x * cellW) + 0.5
+                                                            ctx.moveTo(px, 0)
+                                                            ctx.lineTo(px, height)
+                                                        }
+                                                        for (var y = 0; y <= previewImage.sourceSize.height; ++y) {
+                                                            var py = Math.round(y * cellH) + 0.5
+                                                            ctx.moveTo(0, py)
+                                                            ctx.lineTo(width, py)
+                                                        }
+                                                        ctx.stroke()
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         Column {
@@ -734,9 +876,44 @@ ApplicationWindow {
                                         }
                                     }
 
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 10
+
+                                        StyledCheckBox {
+                                            text: "Continuous"
+                                            checked: correlationEngine.continuousSimilarity
+                                            enabled: correlationEngine.imageAUrl.length > 0 && correlationEngine.imageBUrl.length > 0
+                                            onToggled: correlationEngine.continuousSimilarity = checked
+                                        }
+
+                                        Text {
+                                            text: "square"
+                                            color: root.textMuted
+                                            font.pixelSize: 12
+                                        }
+
+                                        StyledSpinBox {
+                                            Layout.preferredWidth: 78
+                                            from: 1
+                                            to: 99
+                                            value: correlationEngine.continuousWindowSize
+                                            enabled: correlationEngine.continuousSimilarity
+                                            onValueModified: correlationEngine.continuousWindowSize = value
+                                        }
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: correlationEngine.continuousWindowSize + " x " + correlationEngine.continuousWindowSize + " pixels must all pass"
+                                            color: root.textMuted
+                                            font.pixelSize: 11
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
                                     Text {
                                         Layout.fillWidth: true
-                                        text: "Transparent/black areas failed the threshold or lie outside the translated overlap. Visible pixels are the average of Image A and aligned Image B."
+                                        text: "Bright pixels pass the match filter. Dim blended pixels are rejected overlap; red-tinted pixels are A-only, blue-tinted pixels are shifted B-only. Ctrl+wheel zooms the preview."
                                         color: root.textMuted
                                         font.pixelSize: 11
                                         wrapMode: Text.Wrap

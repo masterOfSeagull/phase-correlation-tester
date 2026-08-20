@@ -20,6 +20,9 @@ class PhaseCorrelationEngine final : public QObject
     Q_PROPERTY(bool hasResult READ hasResult NOTIFY resultChanged)
     Q_PROPERTY(int selectedPeakIndex READ selectedPeakIndex NOTIFY previewChanged)
     Q_PROPERTY(double matchedPercent READ matchedPercent NOTIFY previewChanged)
+    Q_PROPERTY(double previewDx READ previewDx WRITE setPreviewDx NOTIFY previewChanged)
+    Q_PROPERTY(double previewDy READ previewDy WRITE setPreviewDy NOTIFY previewChanged)
+    Q_PROPERTY(bool customPreviewShift READ customPreviewShift WRITE setCustomPreviewShift NOTIFY previewChanged)
 
     Q_PROPERTY(bool hannWindow READ hannWindow WRITE setHannWindow NOTIFY settingsChanged)
     Q_PROPERTY(bool limitSearch READ limitSearch WRITE setLimitSearch NOTIFY settingsChanged)
@@ -32,6 +35,8 @@ class PhaseCorrelationEngine final : public QObject
     Q_PROPERTY(double cropTop READ cropTop WRITE setCropTop NOTIFY settingsChanged)
     Q_PROPERTY(double cropRight READ cropRight WRITE setCropRight NOTIFY settingsChanged)
     Q_PROPERTY(double cropBottom READ cropBottom WRITE setCropBottom NOTIFY settingsChanged)
+    Q_PROPERTY(bool continuousSimilarity READ continuousSimilarity WRITE setContinuousSimilarity NOTIFY settingsChanged)
+    Q_PROPERTY(int continuousWindowSize READ continuousWindowSize WRITE setContinuousWindowSize NOTIFY settingsChanged)
 
 public:
     explicit PhaseCorrelationEngine(QObject *parent = nullptr);
@@ -46,6 +51,9 @@ public:
     bool hasResult() const { return m_hasResult; }
     int selectedPeakIndex() const { return m_selectedPeakIndex; }
     double matchedPercent() const { return m_matchedPercent; }
+    double previewDx() const { return m_previewDx; }
+    double previewDy() const { return m_previewDy; }
+    bool customPreviewShift() const { return m_customPreviewShift; }
 
     bool hannWindow() const { return m_hannWindow; }
     bool limitSearch() const { return m_limitSearch; }
@@ -58,11 +66,14 @@ public:
     double cropTop() const { return m_cropTop; }
     double cropRight() const { return m_cropRight; }
     double cropBottom() const { return m_cropBottom; }
+    bool continuousSimilarity() const { return m_continuousSimilarity; }
+    int continuousWindowSize() const { return m_continuousWindowSize; }
 
     Q_INVOKABLE bool setImageA(const QUrl &url);
     Q_INVOKABLE bool setImageB(const QUrl &url);
     Q_INVOKABLE void analyze();
     Q_INVOKABLE void selectPeak(int index);
+    Q_INVOKABLE void refreshPreview();
 
     void setHannWindow(bool value);
     void setLimitSearch(bool value);
@@ -75,6 +86,11 @@ public:
     void setCropTop(double value);
     void setCropRight(double value);
     void setCropBottom(double value);
+    void setContinuousSimilarity(bool value);
+    void setContinuousWindowSize(int value);
+    void setPreviewDx(double value);
+    void setPreviewDy(double value);
+    void setCustomPreviewShift(bool value);
 
 signals:
     void imageAChanged();
@@ -101,7 +117,7 @@ private:
 
     QList<Peak> detectPeaks(const cv::Mat &correlation) const;
     bool writeHeatmap(const cv::Mat &correlation, const QList<Peak> &peaks, QString &outputUrl, QString &error);
-    bool writeCandidatePreview(const Peak &peak, QString &outputUrl, double &matchedPercent, QString &error);
+    bool writeCandidatePreview(double dx, double dy, QString &outputUrl, double &matchedPercent, QString &error);
     bool refreshSelectedPreview(QString &error);
     void loadSettings();
     void saveSettings() const;
@@ -117,6 +133,9 @@ private:
     QList<Peak> m_detectedPeaks;
     double m_runtimeMs = 0.0;
     double m_matchedPercent = 0.0;
+    double m_previewDx = 0.0;
+    double m_previewDy = 0.0;
+    bool m_customPreviewShift = false;
     bool m_hasResult = false;
     int m_selectedPeakIndex = -1;
 
@@ -131,5 +150,7 @@ private:
     double m_cropTop = 0.0;
     double m_cropRight = 1.0;
     double m_cropBottom = 1.0;
+    bool m_continuousSimilarity = false;
+    int m_continuousWindowSize = 5;
     quint64 m_revision = 0;
 };

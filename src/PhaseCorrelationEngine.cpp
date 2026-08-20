@@ -163,6 +163,10 @@ void PhaseCorrelationEngine::analyze()
     m_heatmapUrl = heatmap;
     m_detectedPeaks = detected;
     m_selectedPeakIndex = 0;
+    if (!m_customPreviewShift) {
+        m_previewDx = detected.front().dx;
+        m_previewDy = detected.front().dy;
+    }
     m_hasResult = true;
 
     QString previewError;
@@ -195,6 +199,10 @@ void PhaseCorrelationEngine::selectPeak(int index)
     }
 
     m_selectedPeakIndex = index;
+    if (!m_customPreviewShift) {
+        m_previewDx = m_detectedPeaks[index].dx;
+        m_previewDy = m_detectedPeaks[index].dy;
+    }
     QString error;
     if (!refreshSelectedPreview(error)) {
         m_previewUrl.clear();
@@ -213,6 +221,24 @@ void PhaseCorrelationEngine::selectPeak(int index)
                   .arg(peak.dy, 0, 'f', 2)
                   .arg(m_matchedPercent, 0, 'f', 1)
                   .arg(m_similarityThreshold * 100.0, 0, 'f', 0));
+}
+
+void PhaseCorrelationEngine::refreshPreview()
+{
+    QString error;
+    if (!refreshSelectedPreview(error)) {
+        m_previewUrl.clear();
+        m_matchedPercent = 0.0;
+        emit previewChanged();
+        setStatus(QStringLiteral("Could not update candidate preview: %1").arg(error));
+        return;
+    }
+
+    emit previewChanged();
+    setStatus(QStringLiteral("Match preview updated: shift Image B by dx=%1, dy=%2 px. %3% of overlapping pixels are visible.")
+                  .arg(m_previewDx, 0, 'f', 2)
+                  .arg(m_previewDy, 0, 'f', 2)
+                  .arg(m_matchedPercent, 0, 'f', 1));
 }
 
 void PhaseCorrelationEngine::setHannWindow(bool value)
@@ -276,27 +302,83 @@ void PhaseCorrelationEngine::setSimilarityThreshold(double value)
     saveSettings();
     emit settingsChanged();
 
-    if (!m_hasResult || m_selectedPeakIndex < 0 || m_selectedPeakIndex >= m_detectedPeaks.size()) {
+    if (m_previewUrl.isEmpty()) {
         return;
     }
 
-    QString error;
-    if (!refreshSelectedPreview(error)) {
-        m_previewUrl.clear();
-        m_matchedPercent = 0.0;
+    refreshPreview();
+}
+
+void PhaseCorrelationEngine::setContinuousSimilarity(bool value)
+{
+    if (m_continuousSimilarity == value) return;
+    m_continuousSimilarity = value;
+    saveSettings();
+    emit settingsChanged();
+
+    if (!m_previewUrl.isEmpty()) {
+        refreshPreview();
+    }
+}
+
+void PhaseCorrelationEngine::setContinuousWindowSize(int value)
+{
+    value = std::clamp(value, 1, 99);
+    if (m_continuousWindowSize == value) return;
+    m_continuousWindowSize = value;
+    saveSettings();
+    emit settingsChanged();
+
+    if (!m_previewUrl.isEmpty()) {
+        refreshPreview();
+    }
+}
+
+void PhaseCorrelationEngine::setPreviewDx(double value)
+{
+    value = std::clamp(value, -100000.0, 100000.0);
+    if (nearlyEqual(m_previewDx, value)) return;
+    m_previewDx = value;
+    saveSettings();
+
+    if (m_customPreviewShift && !m_previewUrl.isEmpty()) {
+        refreshPreview();
+    } else {
         emit previewChanged();
-        setStatus(QStringLiteral("Could not update candidate preview: %1").arg(error));
-        return;
+    }
+}
+
+void PhaseCorrelationEngine::setPreviewDy(double value)
+{
+    value = std::clamp(value, -100000.0, 100000.0);
+    if (nearlyEqual(m_previewDy, value)) return;
+    m_previewDy = value;
+    saveSettings();
+
+    if (m_customPreviewShift && !m_previewUrl.isEmpty()) {
+        refreshPreview();
+    } else {
+        emit previewChanged();
+    }
+}
+
+void PhaseCorrelationEngine::setCustomPreviewShift(bool value)
+{
+    if (m_customPreviewShift == value) return;
+    m_customPreviewShift = value;
+
+    if (!m_customPreviewShift && m_selectedPeakIndex >= 0 && m_selectedPeakIndex < m_detectedPeaks.size()) {
+        m_previewDx = m_detectedPeaks[m_selectedPeakIndex].dx;
+        m_previewDy = m_detectedPeaks[m_selectedPeakIndex].dy;
     }
 
-    emit previewChanged();
-    const Peak &peak = m_detectedPeaks[m_selectedPeakIndex];
-    setStatus(QStringLiteral("Peak #%1 preview updated: dx=%2, dy=%3 px; %4% of overlap passes the %5% similarity threshold.")
-                  .arg(m_selectedPeakIndex + 1)
-                  .arg(peak.dx, 0, 'f', 2)
-                  .arg(peak.dy, 0, 'f', 2)
-                  .arg(m_matchedPercent, 0, 'f', 1)
-                  .arg(m_similarityThreshold * 100.0, 0, 'f', 0));
+    saveSettings();
+
+    if (!m_previewUrl.isEmpty()) {
+        refreshPreview();
+    } else {
+        emit previewChanged();
+    }
 }
 
 void PhaseCorrelationEngine::setCropLeft(double value)
@@ -562,7 +644,8 @@ bool PhaseCorrelationEngine::writeHeatmap(const cv::Mat &correlation,
     return true;
 }
 
-bool PhaseCorrelationEngine::writeCandidatePreview(const Peak &peak,
+bool PhaseCorrelationEngine::writeCandidatePreview(double dx,
+                                                   double dy,
                                                    QString &outputUrl,
                                                    double &matchedPercent,
                                                    QString &error)
@@ -594,8 +677,8 @@ bool PhaseCorrelationEngine::writeCandidatePreview(const Peak &peak,
     // The detected phase-correlation displacement is the translation to apply to
     // Image B to bring that candidate into Image A's coordinate system.
     const cv::Mat transform = (cv::Mat_<double>(2, 3) <<
-        1.0, 0.0, peak.dx,
-        0.0, 1.0, peak.dy);
+        1.0, 0.0, dx,
+        0.0, 1.0, dy);
 
     cv::Mat alignedB;
     cv::warpAffine(b, alignedB, transform, a.size(), cv::INTER_LINEAR,
@@ -607,14 +690,14 @@ bool PhaseCorrelationEngine::writeCandidatePreview(const Peak &peak,
                    cv::BORDER_CONSTANT, cv::Scalar(0));
 
     cv::Mat preview(a.rows, a.cols, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+    cv::Mat matchMask(a.rows, a.cols, CV_8U, cv::Scalar(0));
     qint64 overlapCount = 0;
-    qint64 matchedCount = 0;
 
     for (int y = 0; y < a.rows; ++y) {
         const cv::Vec4b *rowA = a.ptr<cv::Vec4b>(y);
         const cv::Vec4b *rowB = alignedB.ptr<cv::Vec4b>(y);
         const uchar *rowMask = overlapMask.ptr<uchar>(y);
-        cv::Vec4b *rowOut = preview.ptr<cv::Vec4b>(y);
+        uchar *rowMatch = matchMask.ptr<uchar>(y);
 
         for (int x = 0; x < a.cols; ++x) {
             if (rowMask[x] == 0 || rowA[x][3] == 0 || rowB[x][3] == 0) {
@@ -632,11 +715,87 @@ bool PhaseCorrelationEngine::writeCandidatePreview(const Peak &peak,
                 continue;
             }
 
-            ++matchedCount;
-            rowOut[x][0] = static_cast<uchar>((static_cast<int>(rowA[x][0]) + static_cast<int>(rowB[x][0]) + 1) / 2);
-            rowOut[x][1] = static_cast<uchar>((static_cast<int>(rowA[x][1]) + static_cast<int>(rowB[x][1]) + 1) / 2);
-            rowOut[x][2] = static_cast<uchar>((static_cast<int>(rowA[x][2]) + static_cast<int>(rowB[x][2]) + 1) / 2);
-            rowOut[x][3] = 255;
+            rowMatch[x] = 1;
+        }
+    }
+
+    cv::Mat visibleMask = matchMask;
+    cv::Mat continuousMask;
+    if (m_continuousSimilarity) {
+        const int windowSize = std::clamp(m_continuousWindowSize, 1, 99);
+        const int leftRadius = (windowSize - 1) / 2;
+        const int rightRadius = windowSize / 2;
+        const int topRadius = leftRadius;
+        const int bottomRadius = rightRadius;
+        const int required = windowSize * windowSize;
+
+        cv::Mat integral;
+        cv::integral(matchMask, integral, CV_32S);
+        continuousMask = cv::Mat(a.rows, a.cols, CV_8U, cv::Scalar(0));
+
+        for (int y = topRadius; y + bottomRadius < a.rows; ++y) {
+            uchar *rowVisible = continuousMask.ptr<uchar>(y);
+            for (int x = leftRadius; x + rightRadius < a.cols; ++x) {
+                const int left = x - leftRadius;
+                const int top = y - topRadius;
+                const int right = x + rightRadius + 1;
+                const int bottom = y + bottomRadius + 1;
+                const int sum = integral.at<int>(bottom, right)
+                              - integral.at<int>(top, right)
+                              - integral.at<int>(bottom, left)
+                              + integral.at<int>(top, left);
+                if (sum == required) {
+                    rowVisible[x] = 1;
+                }
+            }
+        }
+
+        visibleMask = continuousMask;
+    }
+
+    qint64 matchedCount = 0;
+    for (int y = 0; y < a.rows; ++y) {
+        const cv::Vec4b *rowA = a.ptr<cv::Vec4b>(y);
+        const cv::Vec4b *rowB = alignedB.ptr<cv::Vec4b>(y);
+        const uchar *rowMask = overlapMask.ptr<uchar>(y);
+        const uchar *rowVisible = visibleMask.ptr<uchar>(y);
+        cv::Vec4b *rowOut = preview.ptr<cv::Vec4b>(y);
+
+        for (int x = 0; x < a.cols; ++x) {
+            const bool hasA = rowA[x][3] > 0;
+            const bool hasB = rowMask[x] != 0 && rowB[x][3] > 0;
+
+            if (rowVisible[x] != 0) {
+                ++matchedCount;
+                rowOut[x][0] = static_cast<uchar>((static_cast<int>(rowA[x][0]) + static_cast<int>(rowB[x][0]) + 1) / 2);
+                rowOut[x][1] = static_cast<uchar>((static_cast<int>(rowA[x][1]) + static_cast<int>(rowB[x][1]) + 1) / 2);
+                rowOut[x][2] = static_cast<uchar>((static_cast<int>(rowA[x][2]) + static_cast<int>(rowB[x][2]) + 1) / 2);
+                rowOut[x][3] = 255;
+                continue;
+            }
+
+            if (hasA && hasB) {
+                rowOut[x][0] = static_cast<uchar>((static_cast<int>(rowA[x][0]) + static_cast<int>(rowB[x][0]) + 1) / 4);
+                rowOut[x][1] = static_cast<uchar>((static_cast<int>(rowA[x][1]) + static_cast<int>(rowB[x][1]) + 1) / 4);
+                rowOut[x][2] = static_cast<uchar>((static_cast<int>(rowA[x][2]) + static_cast<int>(rowB[x][2]) + 1) / 4);
+                rowOut[x][3] = 180;
+                continue;
+            }
+
+            if (hasA) {
+                rowOut[x][0] = static_cast<uchar>(std::min(255, 48 + static_cast<int>(rowA[x][0]) / 3));
+                rowOut[x][1] = static_cast<uchar>(static_cast<int>(rowA[x][1]) / 4);
+                rowOut[x][2] = static_cast<uchar>(static_cast<int>(rowA[x][2]) / 4);
+                rowOut[x][3] = 210;
+                continue;
+            }
+
+            if (hasB) {
+                rowOut[x][0] = static_cast<uchar>(static_cast<int>(rowB[x][0]) / 4);
+                rowOut[x][1] = static_cast<uchar>(static_cast<int>(rowB[x][1]) / 4);
+                rowOut[x][2] = static_cast<uchar>(std::min(255, 48 + static_cast<int>(rowB[x][2]) / 3));
+                rowOut[x][3] = 210;
+            }
         }
     }
 
@@ -668,14 +827,24 @@ bool PhaseCorrelationEngine::writeCandidatePreview(const Peak &peak,
 
 bool PhaseCorrelationEngine::refreshSelectedPreview(QString &error)
 {
-    if (m_selectedPeakIndex < 0 || m_selectedPeakIndex >= m_detectedPeaks.size()) {
+    if (m_imageAUrl.isEmpty() || m_imageBUrl.isEmpty()) {
+        error = QStringLiteral("Load both Image A and Image B first.");
+        return false;
+    }
+
+    if (!m_customPreviewShift && (m_selectedPeakIndex < 0 || m_selectedPeakIndex >= m_detectedPeaks.size())) {
         error = QStringLiteral("No peak candidate is selected.");
         return false;
     }
 
+    if (!m_customPreviewShift) {
+        m_previewDx = m_detectedPeaks[m_selectedPeakIndex].dx;
+        m_previewDy = m_detectedPeaks[m_selectedPeakIndex].dy;
+    }
+
     QString outputUrl;
     double matchedPercent = 0.0;
-    if (!writeCandidatePreview(m_detectedPeaks[m_selectedPeakIndex], outputUrl, matchedPercent, error)) {
+    if (!writeCandidatePreview(m_previewDx, m_previewDy, outputUrl, matchedPercent, error)) {
         return false;
     }
 
@@ -696,6 +865,11 @@ void PhaseCorrelationEngine::loadSettings()
     m_peakCount = std::clamp(settings.value(QStringLiteral("peakCount"), m_peakCount).toInt(), 1, 20);
     m_suppressionRadius = std::clamp(settings.value(QStringLiteral("suppressionRadius"), m_suppressionRadius).toInt(), 1, 512);
     m_similarityThreshold = std::clamp(settings.value(QStringLiteral("similarityThreshold"), m_similarityThreshold).toDouble(), 0.0, 1.0);
+    m_continuousSimilarity = settings.value(QStringLiteral("continuousSimilarity"), m_continuousSimilarity).toBool();
+    m_continuousWindowSize = std::clamp(settings.value(QStringLiteral("continuousWindowSize"), m_continuousWindowSize).toInt(), 1, 99);
+    m_customPreviewShift = settings.value(QStringLiteral("customPreviewShift"), m_customPreviewShift).toBool();
+    m_previewDx = std::clamp(settings.value(QStringLiteral("previewDx"), m_previewDx).toDouble(), -100000.0, 100000.0);
+    m_previewDy = std::clamp(settings.value(QStringLiteral("previewDy"), m_previewDy).toDouble(), -100000.0, 100000.0);
 
     m_cropLeft = std::clamp(settings.value(QStringLiteral("cropLeft"), m_cropLeft).toDouble(), 0.0, 1.0);
     m_cropTop = std::clamp(settings.value(QStringLiteral("cropTop"), m_cropTop).toDouble(), 0.0, 1.0);
@@ -723,6 +897,11 @@ void PhaseCorrelationEngine::saveSettings() const
     settings.setValue(QStringLiteral("peakCount"), m_peakCount);
     settings.setValue(QStringLiteral("suppressionRadius"), m_suppressionRadius);
     settings.setValue(QStringLiteral("similarityThreshold"), m_similarityThreshold);
+    settings.setValue(QStringLiteral("continuousSimilarity"), m_continuousSimilarity);
+    settings.setValue(QStringLiteral("continuousWindowSize"), m_continuousWindowSize);
+    settings.setValue(QStringLiteral("customPreviewShift"), m_customPreviewShift);
+    settings.setValue(QStringLiteral("previewDx"), m_previewDx);
+    settings.setValue(QStringLiteral("previewDy"), m_previewDy);
     settings.setValue(QStringLiteral("cropLeft"), m_cropLeft);
     settings.setValue(QStringLiteral("cropTop"), m_cropTop);
     settings.setValue(QStringLiteral("cropRight"), m_cropRight);
